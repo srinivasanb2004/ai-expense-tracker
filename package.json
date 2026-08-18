@@ -12,28 +12,28 @@
     "db:studio": "prisma studio"
   },
   "dependencies": {
-    "next": "16.0.1",
+    "@prisma/client": "6.19.0",
+    "bcryptjs": "2.4.3",
+    "framer-motion": "12.0.0",
+    "lucide-react": "0.468.0",
+    "next": "^16.3.1",
+    "next-auth": "5.0.0-beta.30",
     "react": "19.2.0",
     "react-dom": "19.2.0",
-    "lucide-react": "0.468.0",
     "recharts": "2.15.0",
-    "framer-motion": "12.0.0",
-    "zustand": "5.0.2",
-    "next-auth": "5.0.0-beta.30",
-    "@prisma/client": "6.19.0",
-    "bcryptjs": "2.4.3"
+    "zustand": "5.0.2"
   },
   "devDependencies": {
-    "typescript": "5.7.2",
+    "@tailwindcss/postcss": "^4.1.0",
+    "@types/bcryptjs": "2.4.6",
     "@types/node": "22.10.2",
     "@types/react": "19.0.3",
     "@types/react-dom": "19.0.2",
-    "tailwindcss": "^4.1.0",
-    "@tailwindcss/postcss": "^4.1.0",
     "eslint": "9.17.0",
     "eslint-config-next": "16.0.1",
+    "postcss": "^8.4.49",
     "prisma": "6.19.0",
-    "@types/bcryptjs": "2.4.6",
-    "postcss": "^8.4.49"
+    "tailwindcss": "^4.1.0",
+    "typescript": "5.7.2"
   }
 }
