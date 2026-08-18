@@ -3,7 +3,6 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { signOut } from "next-auth/react"
-
 import {
   LayoutDashboard,
   ReceiptText,
@@ -29,12 +28,13 @@ const items = [
   ["/settings", "Settings", Settings],
 ] as const
 
+/* Mobile bottom navigation */
 const mobileItems = [
   ["/dashboard", "Home", LayoutDashboard],
   ["/expenses", "Expenses", ReceiptText],
-  ["/assistant", "AI", Bot],
+  ["/income", "Income", ArrowUpCircle],
+  ["/budgets", "Budgets", WalletCards],
   ["/analytics", "Analytics", ChartNoAxesCombined],
-  ["/settings", "Settings", Settings],
 ] as const
 
 export default function Sidebar() {
@@ -58,16 +58,12 @@ export default function Sidebar() {
               key={href}
               href={href}
               className={`nav-item ${
-                active(href)
-                  ? "nav-item-active"
-                  : ""
+                active(href) ? "nav-item-active" : ""
               }`}
             >
               <span
                 className={`nav-icon ${
-                  active(href)
-                    ? "nav-icon-active"
-                    : ""
+                  active(href) ? "nav-icon-active" : ""
                 }`}
               >
                 <Icon size={17} />
@@ -99,25 +95,21 @@ export default function Sidebar() {
 
       {/* Mobile bottom navigation */}
       <nav className="mobile-nav fixed bottom-3 left-3 right-3 z-50 grid grid-cols-5 gap-1 rounded-[22px] border p-2 md:hidden">
-        {mobileItems.map(
-          ([href, label, Icon]) => (
-            <Link
-              key={href}
-              href={href}
-              className={`mobile-nav-item ${
-                active(href)
-                  ? "mobile-nav-active"
-                  : ""
-              }`}
-            >
-              <Icon size={18} />
+        {mobileItems.map(([href, label, Icon]) => (
+          <Link
+            key={href}
+            href={href}
+            className={`mobile-nav-item ${
+              active(href) ? "mobile-nav-active" : ""
+            }`}
+          >
+            <Icon size={18} />
 
-              <span className="mt-1 text-[9px] font-bold">
-                {label}
-              </span>
-            </Link>
-          )
-        )}
+            <span className="mt-1 text-[9px] font-bold">
+              {label}
+            </span>
+          </Link>
+        ))}
       </nav>
     </>
   )

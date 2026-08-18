@@ -1,7 +1,14 @@
 "use client"
 
 import Link from "next/link"
-import { Bell, Plus, ScanLine } from "lucide-react"
+import {
+  Bell,
+  Plus,
+  ScanLine,
+  Bot,
+  Settings,
+} from "lucide-react"
+
 import Logo from "./logo"
 
 export default function Topbar() {
@@ -11,7 +18,7 @@ export default function Topbar() {
         sticky top-0 z-30
         flex h-[76px] w-full
         items-center justify-between
-        gap-3 border-b
+        gap-2 border-b
         px-4 md:h-20 md:px-8
         backdrop-blur-xl
       "
@@ -23,7 +30,7 @@ export default function Topbar() {
       }}
     >
       {/* Mobile Logo */}
-      <div className="min-w-0 md:hidden">
+      <div className="min-w-0 flex-1 md:hidden">
         <Logo />
       </div>
 
@@ -41,7 +48,6 @@ export default function Topbar() {
         </h1>
       </div>
 
-      {/* Actions */}
       <div className="ml-auto flex shrink-0 items-center gap-2">
 
         {/* Scan */}
@@ -49,13 +55,10 @@ export default function Topbar() {
           href="/scan"
           aria-label="Scan receipt"
           className="
-            flex h-11 shrink-0
-            items-center justify-center
-            gap-2 whitespace-nowrap
-            rounded-xl border
-            px-4 text-sm font-bold
-            transition
-            hover:-translate-y-0.5
+            grid h-11 w-11 shrink-0
+            place-items-center rounded-xl border
+            transition hover:-translate-y-0.5
+            md:flex md:w-auto md:gap-2 md:px-4
           "
           style={{
             borderColor: "var(--line)",
@@ -63,51 +66,85 @@ export default function Topbar() {
             color: "var(--text)",
           }}
         >
-          <ScanLine size={17} className="shrink-0" />
+          <ScanLine size={18} />
 
-          <span className="hidden sm:inline">
+          <span className="hidden md:inline">
             Scan
           </span>
         </Link>
 
-        {/* Add Expense */}
+        {/* AI - Mobile */}
+        <Link
+          href="/assistant"
+          aria-label="AI Assistant"
+          className="
+            grid h-11 w-11 shrink-0
+            place-items-center rounded-xl border
+            transition hover:-translate-y-0.5
+            md:hidden
+          "
+          style={{
+            borderColor: "var(--line)",
+            background:
+              "linear-gradient(135deg,#6ee7b7,#22c55e)",
+            color: "#052018",
+          }}
+        >
+          <Bot size={19} />
+        </Link>
+
+        {/* Settings - Mobile */}
+        <Link
+          href="/settings"
+          aria-label="Settings"
+          className="
+            grid h-11 w-11 shrink-0
+            place-items-center rounded-xl border
+            transition hover:-translate-y-0.5
+            md:hidden
+          "
+          style={{
+            borderColor: "var(--line)",
+            background: "var(--secondary-bg)",
+            color: "var(--text)",
+          }}
+        >
+          <Settings size={19} />
+        </Link>
+
+        {/* Add Expense - Desktop */}
         <Link
           href="/expenses?new=1"
-          aria-label="Add expense"
           className="
-            flex h-11 shrink-0
+            hidden h-11 shrink-0
             items-center justify-center
             gap-2 whitespace-nowrap
-            rounded-xl
-            px-4 text-sm font-bold
+            rounded-xl px-4
+            text-sm font-bold
             transition
             hover:-translate-y-0.5
+            md:flex
           "
           style={{
             background:
-              "linear-gradient(135deg, #6ee7b7, #22c55e)",
+              "linear-gradient(135deg,#6ee7b7,#22c55e)",
             color: "#052018",
-            boxShadow:
-              "0 8px 25px rgba(34,197,94,.18)",
           }}
         >
-          <Plus size={17} className="shrink-0" />
+          <Plus size={17} />
 
-          <span className="hidden sm:inline">
-            Add expense
-          </span>
+          Add expense
         </Link>
 
-        {/* Notifications */}
+        {/* Notification - Desktop only */}
         <button
           type="button"
           aria-label="Notifications"
           className="
-            grid h-11 w-11 shrink-0
-            place-items-center
-            rounded-xl border
-            transition
-            hover:-translate-y-0.5
+            hidden h-11 w-11 shrink-0
+            place-items-center rounded-xl border
+            transition hover:-translate-y-0.5
+            md:grid
           "
           style={{
             borderColor: "var(--line)",
