@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   ReceiptText,
   ScanLine,
+  Repeat2,
   ChartNoAxesCombined,
   WalletCards,
   Bot,
@@ -20,6 +21,7 @@ import Logo from "./logo"
 const items = [
   ["/dashboard", "Dashboard", LayoutDashboard],
   ["/expenses", "Expenses", ReceiptText],
+  ["/recurring", "Recurring Payments", Repeat2],
   ["/income", "Income", ArrowUpCircle],
   ["/budgets", "Budgets", WalletCards],
   ["/analytics", "Analytics", ChartNoAxesCombined],

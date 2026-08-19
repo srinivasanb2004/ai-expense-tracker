@@ -1,5 +1,6 @@
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
+import { createReceiptSavedNotification, syncAllNotifications } from "@/lib/notifications"
 import { NextResponse } from "next/server"
 
 async function getUserId() {
@@ -11,14 +12,8 @@ export async function GET() {
   const userId = await getUserId()
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const expenses = await prisma.expense.findMany({
-    where: { userId },
-    orderBy: { date: "desc" },
-  })
-
-  return NextResponse.json(
-    expenses.map((expense) => ({ ...expense, amount: Number(expense.amount) }))
-  )
+  const expenses = await prisma.expense.findMany({ where: { userId }, orderBy: { date: "desc" } })
+  return NextResponse.json(expenses.map((expense) => ({ ...expense, amount: Number(expense.amount) })))
 }
 
 export async function POST(req: Request) {
@@ -44,6 +39,12 @@ export async function POST(req: Request) {
         notes: body.notes ? String(body.notes) : null,
       },
     })
+
+    if (body.source === "receipt_scan") {
+      await createReceiptSavedNotification(userId, expense.merchant, amount)
+    }
+
+    await syncAllNotifications(userId)
 
     return NextResponse.json({ ...expense, amount: Number(expense.amount) }, { status: 201 })
   } catch (error) {

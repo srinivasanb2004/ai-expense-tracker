@@ -1,8 +1,9 @@
 "use client"
 
 import AppShell from "@/components/app-shell"
+import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
-import { Search, Trash2, Plus } from "lucide-react"
+import { Search, Trash2, Plus, Repeat2 } from "lucide-react"
 
 type Expense = {
   id: string
@@ -100,15 +101,20 @@ export default function Expenses() {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setOpen((value) => !value)}
-          className="btn btn-primary"
-        >
-          <Plus size={17} />
-
-          {open ? "Close" : "New expense"}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/recurring" className="btn btn-secondary">
+            <Repeat2 size={17} />
+            Recurring
+          </Link>
+          <button
+            type="button"
+            onClick={() => setOpen((value) => !value)}
+            className="btn btn-primary"
+          >
+            <Plus size={17} />
+            {open ? "Close" : "New expense"}
+          </button>
+        </div>
       </div>
 
       {open && (

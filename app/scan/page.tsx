@@ -57,6 +57,7 @@ export default function Scan() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...data,
+          source: "receipt_scan",
           date: data.date || new Date().toISOString().slice(0, 10),
           notes: [data.notes, data.tax != null ? `GST/Tax: ₹${data.tax}` : null].filter(Boolean).join(" · "),
         }),

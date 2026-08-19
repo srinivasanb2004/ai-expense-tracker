@@ -1,24 +1,50 @@
 # Smart Expense Tracker
 
-Full-stack personal finance tracker built with Next.js, Prisma/PostgreSQL, Auth.js and Gemini.
+AI-powered personal finance tracker built with Next.js, Auth.js, Prisma, Supabase/PostgreSQL and Gemini.
 
-## Included
-- Authentication and per-user data
-- Expenses, income and budgets
-- Gemini receipt OCR (merchant, total, date, tax, category)
-- Gemini finance assistant
-- Advanced analytics: spending trend, category donut, income vs expense, savings trend, highest-spend day, top merchants
-- Date filters: this month, last month, last 3 months and custom range
-- Monthly summary-ready notifications
-- CSV export, light/dark mode and clear-all-data control
+## Core features
+
+- Authentication and per-user financial data
+- Expenses, income and category budgets
+- Recurring payments with weekly/monthly/yearly schedules
+- Mark recurring payment as paid to create an expense and advance the next due date
+- Gemini receipt OCR and AI finance assistant
+- Advanced analytics and date filters
+- Dark/light theme persistence
+- CSV export and clear-all-data controls
 - Responsive mobile navigation
 
-## Setup
-1. `npm install`
-2. Copy `.env.example` to `.env`
-3. Add your Supabase transaction-pooler `DATABASE_URL`, `AUTH_SECRET`, and Gemini key
-4. `npm run db:generate`
-5. `npm run db:push` (only if your database schema is not already created)
-6. `npm run dev`
+## Smart notifications
 
-If your schema was already pushed previously, you normally only need `npm run db:generate` after extracting this ZIP.
+- Budget warning at 90% usage
+- Budget exceeded alert
+- Recurring payment due tomorrow / due today reminders
+- Persistent overdue recurring-payment reminders with overdue day count until marked paid
+- Receipt scan saved
+- Income added
+- Previous-month summary ready
+- Unusual category spending (35%+ over previous month, with a minimum prior baseline)
+- Low remaining balance when less than or equal to 10% of monthly income remains
+
+Desktop notifications are available from the topbar bell. On mobile, notifications are available in Settings.
+
+## Environment variables
+
+Copy `.env.example` to `.env` and configure:
+
+```env
+DATABASE_URL="your-supabase-transaction-pooler-url"
+AUTH_SECRET="your-auth-secret"
+GEMINI_API_KEY="your-gemini-api-key"
+GEMINI_MODEL="gemini-2.5-flash"
+```
+
+## Run locally
+
+```bash
+npm install
+npm run db:generate
+npm run dev
+```
+
+The Prisma schema already contains the recurring payment and notification models. If your existing Supabase database came from the current project schema, no new model is required for these features.
