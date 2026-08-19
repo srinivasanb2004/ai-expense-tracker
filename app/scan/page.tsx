@@ -1,6 +1,7 @@
 "use client"
 
 import AppShell from "@/components/app-shell"
+import Link from "next/link"
 import { CheckCircle2, FileText, ScanLine, UploadCloud } from "lucide-react"
 import { useState } from "react"
 
@@ -76,6 +77,13 @@ export default function Scan() {
 
   return (
     <AppShell>
+      <Link
+        href="/expenses"
+        className="mb-5 inline-flex items-center gap-2 text-sm font-bold accent transition hover:opacity-80"
+      >
+        ← Back to Expenses
+      </Link>
+
       <div>
         <p className="eyebrow">Gemini Vision</p>
         <h2 className="mt-2 text-3xl font-black">Scan Receipt</h2>

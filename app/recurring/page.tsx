@@ -1,6 +1,7 @@
 "use client"
 
 import AppShell from "@/components/app-shell"
+import Link from "next/link"
 import {
   AlertTriangle,
   CalendarClock,
@@ -169,6 +170,13 @@ export default function RecurringPage() {
 
   return (
     <AppShell>
+      <Link
+        href="/expenses"
+        className="mb-5 inline-flex items-center gap-2 text-sm font-bold accent transition hover:opacity-80"
+      >
+        ← Back to Expenses
+      </Link>
+
       <div>
         <p className="eyebrow">Payments</p>
         <h2 className="mt-2 text-3xl font-black">Recurring Payments</h2>
