@@ -61,7 +61,7 @@ export default function Topbar() {
 
   return (
     <header
-      className="sticky top-0 z-30 flex h-[76px] w-full items-center justify-between gap-2 border-b px-4 backdrop-blur-xl md:h-20 md:px-8"
+      className="sticky top-0 z-30 flex h-[76px] w-full items-center justify-between gap-2 border-b px-3 backdrop-blur-xl md:h-20 md:px-8"
       style={{
         background: "color-mix(in srgb, var(--bg) 88%, transparent)",
         borderColor: "var(--line)",
@@ -76,14 +76,15 @@ export default function Topbar() {
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-2">
+        {/* Scan stays in the desktop topbar; on mobile it lives in Expenses with Recurring. */}
         <Link
           href="/scan"
           aria-label="Scan receipt"
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border transition hover:-translate-y-0.5 md:flex md:w-auto md:gap-2 md:px-4"
+          className="hidden h-11 shrink-0 items-center justify-center gap-2 rounded-xl border px-4 transition hover:-translate-y-0.5 md:flex"
           style={{ borderColor: "var(--line)", background: "var(--secondary)", color: "var(--text)" }}
         >
           <ScanLine size={18} />
-          <span className="hidden md:inline">Scan</span>
+          <span>Scan</span>
         </Link>
 
         <Link
@@ -95,24 +96,8 @@ export default function Topbar() {
           <Bot size={19} />
         </Link>
 
-        <Link
-          href="/settings"
-          aria-label="Settings"
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border transition hover:-translate-y-0.5 md:hidden"
-          style={{ borderColor: "var(--line)", background: "var(--secondary)", color: "var(--text)" }}
-        >
-          <Settings size={19} />
-        </Link>
-
-        <Link
-          href="/expenses?new=1"
-          className="hidden h-11 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 text-sm font-bold transition hover:-translate-y-0.5 md:flex"
-          style={{ background: "linear-gradient(135deg,#6ee7b7,#22c55e)", color: "#052018" }}
-        >
-          <Plus size={17} /> Add expense
-        </Link>
-
-        <div ref={box} className="relative hidden md:block">
+        {/* Notifications now work on both mobile and desktop. */}
+        <div ref={box} className="relative">
           <button
             type="button"
             aria-label="Notifications"
@@ -143,10 +128,10 @@ export default function Topbar() {
                   <button
                     key={item.id}
                     onClick={() => markRead(item.id)}
-                    className={`w-full rounded-2xl p-3 text-left transition hover:bg-white/5 ${item.read ? "opacity-65" : "bg-emerald-400/5"}`}
+                    className={`notification-item w-full rounded-2xl p-3 text-left transition ${item.read ? "opacity-65" : "notification-item-unread"}`}
                   >
                     <div className="flex gap-3">
-                      <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${item.read ? "bg-white/15" : "bg-emerald-400"}`} />
+                      <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${item.read ? "notification-dot-read" : "bg-emerald-400"}`} />
                       <div>
                         <p className="text-sm font-black">{item.title}</p>
                         <p className="mt-1 text-xs leading-5 muted">{item.body}</p>
@@ -159,6 +144,23 @@ export default function Topbar() {
             </div>
           )}
         </div>
+
+        <Link
+          href="/settings"
+          aria-label="Settings"
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border transition hover:-translate-y-0.5 md:hidden"
+          style={{ borderColor: "var(--line)", background: "var(--secondary)", color: "var(--text)" }}
+        >
+          <Settings size={19} />
+        </Link>
+
+        <Link
+          href="/expenses?new=1"
+          className="hidden h-11 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 text-sm font-bold transition hover:-translate-y-0.5 md:flex"
+          style={{ background: "linear-gradient(135deg,#6ee7b7,#22c55e)", color: "#052018" }}
+        >
+          <Plus size={17} /> Add expense
+        </Link>
       </div>
     </header>
   )

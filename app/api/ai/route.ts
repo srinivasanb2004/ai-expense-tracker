@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     const expenses = await prisma.expense.findMany({ where: { userId }, orderBy: { date: "desc" }, take: 300 })
     const incomes = await prisma.income.findMany({ where: { userId }, orderBy: { date: "desc" }, take: 100 })
 
-    const prompt = `You are a concise personal-finance assistant inside Smart Expense Tracker. Currency is Indian Rupees (₹). Answer ONLY from the user's data below. Calculate carefully, never invent transactions, and say when data is insufficient.\n\nEXPENSES:\n${JSON.stringify(expenses.map(e => ({ merchant: e.merchant, amount: Number(e.amount), category: e.category, paymentMethod: e.paymentMethod, date: e.date.toISOString().slice(0,10), notes: e.notes })))}\n\nINCOME:\n${JSON.stringify(incomes.map(i => ({ source: i.source, amount: Number(i.amount), category: i.category, date: i.date.toISOString().slice(0,10) })))}\n\nQUESTION:\n${question}`
+    const prompt = `You are a concise personal-finance assistant inside Smart AI Expense Tracker. Currency is Indian Rupees (₹). Answer ONLY from the user's data below. Calculate carefully, never invent transactions, and say when data is insufficient.\n\nEXPENSES:\n${JSON.stringify(expenses.map(e => ({ merchant: e.merchant, amount: Number(e.amount), category: e.category, paymentMethod: e.paymentMethod, date: e.date.toISOString().slice(0,10), notes: e.notes })))}\n\nINCOME:\n${JSON.stringify(incomes.map(i => ({ source: i.source, amount: Number(i.amount), category: i.category, date: i.date.toISOString().slice(0,10) })))}\n\nQUESTION:\n${question}`
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,

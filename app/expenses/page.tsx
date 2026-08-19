@@ -3,7 +3,7 @@
 import AppShell from "@/components/app-shell"
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
-import { Search, Trash2, Plus, Repeat2 } from "lucide-react"
+import { Search, Trash2, Plus, Repeat2, ScanLine } from "lucide-react"
 
 type Expense = {
   id: string
@@ -102,6 +102,10 @@ export default function Expenses() {
         </div>
 
         <div className="flex flex-wrap gap-2">
+          <Link href="/scan" className="btn btn-secondary md:hidden">
+            <ScanLine size={17} />
+            Scan
+          </Link>
           <Link href="/recurring" className="btn btn-secondary">
             <Repeat2 size={17} />
             Recurring

@@ -195,7 +195,7 @@ export default function RecurringPage() {
           const urgent = item.active && (status.kind === "today" || status.kind === "overdue")
 
           return (
-            <div key={item.id} className="stat-card">
+            <div key={item.id} className="stat-card recurring-card">
               <div className="flex items-start gap-3">
                 <div className="transaction-icon"><CalendarClock size={18} /></div>
 
@@ -212,7 +212,7 @@ export default function RecurringPage() {
                   </p>
 
                   {!item.active ? (
-                    <div className="mt-3 flex items-start gap-2 rounded-xl border border-white/8 bg-white/5 px-3 py-2.5">
+                    <div className="recurring-status recurring-status-paused mt-3 flex items-start gap-2 rounded-xl border px-3 py-2.5">
                       <PauseCircle size={16} className="mt-0.5 shrink-0 muted" />
                       <div>
                         <p className="text-xs font-black muted">Reminders paused</p>
@@ -220,19 +220,19 @@ export default function RecurringPage() {
                       </div>
                     </div>
                   ) : status.kind === "overdue" ? (
-                    <div className="mt-3 flex items-start gap-2 rounded-xl border border-rose-400/30 bg-rose-500/10 px-3 py-2.5">
+                    <div className="recurring-status recurring-status-overdue mt-3 flex items-start gap-2 rounded-xl border px-3 py-2.5">
                       <AlertTriangle size={17} className="mt-0.5 shrink-0 text-rose-400" />
                       <div>
-                        <p className="text-sm font-black text-rose-300">{status.label}</p>
-                        <p className="mt-1 text-xs text-rose-200/80">{status.sublabel} · Please pay ₹{item.amount.toLocaleString("en-IN")}</p>
+                        <p className="recurring-overdue-title text-sm font-black">{status.label}</p>
+                        <p className="recurring-overdue-copy mt-1 text-xs">{status.sublabel} · Please pay ₹{item.amount.toLocaleString("en-IN")}</p>
                       </div>
                     </div>
                   ) : status.kind === "today" ? (
-                    <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-300/30 bg-amber-400/10 px-3 py-2.5">
+                    <div className="recurring-status recurring-status-today mt-3 flex items-start gap-2 rounded-xl border px-3 py-2.5">
                       <Clock3 size={17} className="mt-0.5 shrink-0 text-amber-300" />
                       <div>
-                        <p className="text-sm font-black text-amber-200">Due today</p>
-                        <p className="mt-1 text-xs text-amber-100/75">₹{item.amount.toLocaleString("en-IN")} payment pending · Mark it paid when completed.</p>
+                        <p className="recurring-today-title text-sm font-black">Due today</p>
+                        <p className="recurring-today-copy mt-1 text-xs">₹{item.amount.toLocaleString("en-IN")} payment pending · Mark it paid when completed.</p>
                       </div>
                     </div>
                   ) : (
