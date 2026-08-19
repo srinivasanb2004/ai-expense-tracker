@@ -83,9 +83,7 @@ export default function Sidebar() {
         <button
           type="button"
           onClick={() =>
-            signOut({
-              callbackUrl: "/login",
-            })
+            signOut({ callbackUrl: "/" })
           }
           className="nav-item mt-4 w-full"
         >

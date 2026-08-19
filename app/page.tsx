@@ -62,13 +62,10 @@ export default async function Home() {
           <div className="mt-8 flex flex-wrap gap-3">
             {/* Same smart behavior as Get Started */}
             <Link
-              href={getStartedHref}
+              href="/register"
               className="btn btn-primary"
             >
-              {session?.user
-                ? "Open dashboard"
-                : "Create your account"}
-
+              Create your account
               <ArrowRight size={18} />
             </Link>
 
