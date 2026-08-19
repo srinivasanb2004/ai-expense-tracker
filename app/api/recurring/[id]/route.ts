@@ -33,6 +33,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const item = await prisma.recurringExpense.findFirst({ where: { id, userId } })
   if (!item) return NextResponse.json({ error: "Recurring payment not found." }, { status: 404 })
 
+  if (body.action === "edit") {
+    const amount = Number(body.amount)
+    if (!body.merchant || !body.category || !body.paymentMethod || !body.frequency || !body.nextDate || !Number.isFinite(amount) || amount <= 0) return NextResponse.json({ error: "Complete all recurring payment fields." }, { status: 400 })
+    const updated = await prisma.recurringExpense.update({ where: { id }, data: { merchant:String(body.merchant), amount, category:String(body.category), paymentMethod:String(body.paymentMethod), frequency:String(body.frequency), nextDate:new Date(body.nextDate) } })
+    return NextResponse.json({ ...updated, amount:Number(updated.amount) })
+  }
+
   if (body.action === "mark_paid") {
     const nextDate = advanceDate(item.nextDate, item.frequency)
     const [, updated] = await prisma.$transaction([

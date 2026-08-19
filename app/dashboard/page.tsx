@@ -1,7 +1,7 @@
 import AppShell from "@/components/app-shell"
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
-import { ArrowDownRight, ArrowUpRight, Wallet, Target, Sparkles, ArrowRight, ReceiptText } from "lucide-react"
+import { ArrowDownRight, ArrowUpRight, Wallet, Target, Sparkles, ArrowRight, ReceiptText, Plus, ScanLine, HandCoins } from "lucide-react"
 import Greeting from "@/components/greeting"
 function money(value: number) {
   return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(value)
@@ -40,6 +40,13 @@ export default async function Dashboard() {
           <Greeting name={session?.user?.name} />
         </h2>
         <p className="mt-2 text-sm muted">Here&apos;s how your money is moving this month.</p></div>
+
+      <section className="mt-5 flex flex-wrap gap-2" aria-label="Quick actions">
+        <a href="/expenses?new=1" className="btn btn-primary"><Plus size={16}/>Add expense</a>
+        <a href="/income" className="btn btn-secondary"><ArrowUpRight size={16}/>Add income</a>
+        <a href="/borrow-lend" className="btn btn-secondary"><HandCoins size={16}/>Borrow/Lend</a>
+        <a href="/scan" className="btn btn-secondary"><ScanLine size={16}/>Scan receipt</a>
+      </section>
 
       <section className="hero-card mt-6">
         <div className="relative z-10 grid gap-7 lg:grid-cols-[1.2fr_.8fr] lg:items-end">

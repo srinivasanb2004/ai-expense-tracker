@@ -10,8 +10,11 @@ import {
   PauseCircle,
   PlayCircle,
   Trash2,
+  Pencil,
+  Plus,
 } from "lucide-react"
 import { useEffect, useState } from "react"
+import Toast, { ToastState } from "@/components/toast"
 
 const categories = ["Food", "Transport", "Shopping", "Bills", "Health", "Entertainment", "Education", "Other"]
 const payments = ["UPI", "Card", "Cash", "Bank Transfer", "Other"]
@@ -103,10 +106,16 @@ export default function RecurringPage() {
   const [items, setItems] = useState<Recurring[]>([])
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState("")
+  const [edit, setEdit] = useState<Recurring | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [toast, setToast] = useState<ToastState>(null)
+  function say(message:string,type:"success"|"error"="success"){setToast({message,type});setTimeout(()=>setToast(null),2500)}
 
   async function load() {
+    setLoading(true)
     const response = await fetch("/api/recurring")
     if (response.ok) setItems(await response.json())
+    setLoading(false)
   }
 
   useEffect(() => {
@@ -135,13 +144,21 @@ export default function RecurringPage() {
     }
 
     form.reset()
-    setMessage("Recurring payment added.")
+    say("Recurring payment added")
     await load()
+  }
+
+  async function saveEdit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault(); if(!edit)return; setBusy(true)
+    const response=await fetch(`/api/recurring/${edit.id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"edit",...Object.fromEntries(new FormData(e.currentTarget))})})
+    setBusy(false); const d=await response.json().catch(()=>({})); if(!response.ok)return say(d.error||"Could not update payment","error")
+    setEdit(null); say("Recurring payment updated"); await load()
   }
 
   async function remove(id: string) {
     if (!window.confirm("Delete this recurring payment?")) return
     await fetch(`/api/recurring/${id}`, { method: "DELETE" })
+    say("Recurring payment deleted")
     await load()
   }
 
@@ -162,7 +179,7 @@ export default function RecurringPage() {
     })
 
     if (response.ok) {
-      setMessage("Payment added to expenses and the next due date was updated.")
+      say("Payment recorded and next due date updated")
     }
 
     await load()
@@ -170,6 +187,7 @@ export default function RecurringPage() {
 
   return (
     <AppShell>
+      <Toast toast={toast} onClose={()=>setToast(null)} />
       <Link
         href="/expenses"
         className="mb-5 inline-flex items-center gap-2 text-sm font-bold accent transition hover:opacity-80"
@@ -194,6 +212,8 @@ export default function RecurringPage() {
           {busy ? "Saving..." : "Add recurring payment"}
         </button>
       </form>
+
+      {edit && <form onSubmit={saveEdit} className="soft-panel mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3"><input name="merchant" defaultValue={edit.merchant} className="input" required/><input name="amount" defaultValue={edit.amount} className="input" type="number" min="1" step=".01" required/><select name="category" defaultValue={edit.category} className="input">{categories.map(x=><option key={x}>{x}</option>)}</select><select name="paymentMethod" defaultValue={edit.paymentMethod} className="input">{payments.map(x=><option key={x}>{x}</option>)}</select><select name="frequency" defaultValue={edit.frequency} className="input">{frequencies.map(x=><option key={x}>{x}</option>)}</select><input name="nextDate" defaultValue={new Date(edit.nextDate).toISOString().slice(0,10)} className="input" type="date" required/><div className="flex gap-2 md:col-span-2 xl:col-span-3"><button disabled={busy} className="btn btn-primary">Update payment</button><button type="button" onClick={()=>setEdit(null)} className="btn btn-secondary">Cancel</button></div></form>}
 
       {message && <p className="mt-3 text-sm muted">{message}</p>}
 
@@ -268,6 +288,8 @@ export default function RecurringPage() {
                   {item.active ? "Pause" : "Resume"}
                 </button>
 
+                <button onClick={() => setEdit(item)} className="btn btn-secondary"><Pencil size={16}/>Edit</button>
+
                 <button onClick={() => remove(item.id)} className="btn btn-secondary text-rose-400">
                   <Trash2 size={16} />Delete
                 </button>
@@ -276,11 +298,8 @@ export default function RecurringPage() {
           )
         })}
 
-        {!items.length && (
-          <div className="soft-panel lg:col-span-2">
-            <p className="py-8 text-center muted">No recurring payments yet.</p>
-          </div>
-        )}
+        {loading && [1,2].map(x=><div key={x} className="skeleton h-64"/>)}
+        {!loading && !items.length && <div className="empty-state lg:col-span-2"><CalendarClock className="mx-auto accent"/><p className="mt-3 font-black">No recurring payments yet</p><p className="mt-1 text-sm muted">Track your first subscription, rent, EMI or repeating bill.</p><button onClick={()=>document.querySelector<HTMLInputElement>('input[name=merchant]')?.focus()} className="btn btn-primary mt-4"><Plus size={16}/>Track first payment</button></div>}
       </div>
     </AppShell>
   )

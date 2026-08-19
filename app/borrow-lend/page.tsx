@@ -13,9 +13,11 @@ import {
   History,
   Plus,
   Trash2,
+  Pencil,
   UserRound,
 } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
+import Toast, { ToastState } from "@/components/toast"
 
 type Repayment = {
   id: string
@@ -116,6 +118,9 @@ export default function BorrowLendPage() {
   const [message, setMessage] = useState("")
   const [repayId, setRepayId] = useState<string | null>(null)
   const [expandedPerson, setExpandedPerson] = useState<string | null>(null)
+  const [edit, setEdit] = useState<RecordItem | null>(null)
+  const [toast, setToast] = useState<ToastState>(null)
+  function say(message:string,type:"success"|"error"="success"){setToast({message,type});setTimeout(()=>setToast(null),2500)}
 
   async function load() {
     const response = await fetch("/api/borrow-lend", { cache: "no-store" })
@@ -149,6 +154,13 @@ export default function BorrowLendPage() {
     setOpen(false)
     setMessage("Borrow/Lend record saved.")
     await load()
+  }
+
+  async function saveEdit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault(); if(!edit)return; setBusy(true)
+    const response=await fetch(`/api/borrow-lend/${edit.id}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(Object.fromEntries(new FormData(e.currentTarget)))})
+    setBusy(false);const d=await response.json().catch(()=>({}));if(!response.ok)return say(d.error||"Could not update record","error")
+    setEdit(null);say("Borrow/Lend record updated");await load()
   }
 
   async function settleFull(item: RecordItem) {
@@ -199,7 +211,7 @@ export default function BorrowLendPage() {
   async function remove(id: string) {
     if (!window.confirm("Delete this Borrow & Lend record and its repayment history?")) return
     const response = await fetch(`/api/borrow-lend/${id}`, { method: "DELETE" })
-    if (response.ok) await load()
+    if (response.ok) { say("Borrow/Lend record deleted"); await load() }
   }
 
   async function repay(e: React.FormEvent<HTMLFormElement>, item: RecordItem) {
@@ -229,7 +241,7 @@ export default function BorrowLendPage() {
 
     form.reset()
     setRepayId(null)
-    setMessage(data.settled ? "Record fully settled." : "Partial repayment saved.")
+    say(data.settled ? "Record fully settled." : "Repayment recorded")
     await load()
   }
 
@@ -256,6 +268,7 @@ export default function BorrowLendPage() {
 
   return (
     <AppShell>
+      <Toast toast={toast} onClose={()=>setToast(null)} />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="eyebrow">Personal money</p>
@@ -296,6 +309,8 @@ export default function BorrowLendPage() {
         </form>
       )}
 
+      {edit && <form onSubmit={saveEdit} className="soft-panel mt-5 grid gap-3 md:grid-cols-2"><input name="person" defaultValue={edit.person} className="input" required/><input name="phone" defaultValue={edit.phone||""} className="input" placeholder="Phone (optional)"/><select name="type" defaultValue={edit.type} className="input"><option value="BORROWED">I borrowed money</option><option value="LENT">I lent money</option></select><input name="amount" defaultValue={edit.amount} className="input" type="number" min={edit.repaid||1} step=".01" required/><input name="startDate" defaultValue={new Date(edit.startDate).toISOString().slice(0,10)} className="input" type="date" required/><input name="dueDate" defaultValue={edit.dueDate?new Date(edit.dueDate).toISOString().slice(0,10):""} className="input" type="date"/><input name="notes" defaultValue={edit.notes||""} className="input md:col-span-2" placeholder="Notes"/><div className="flex gap-2 md:col-span-2"><button disabled={busy} className="btn btn-primary">Update record</button><button type="button" onClick={()=>setEdit(null)} className="btn btn-secondary">Cancel</button></div></form>}
+
       {message && <p className="mt-3 text-sm font-semibold accent">{message}</p>}
 
       <section className="mt-6">
@@ -328,13 +343,10 @@ export default function BorrowLendPage() {
                     {item.phone && <p className="mt-1 text-xs muted">Contact: {item.phone}</p>}
                   </div>
 
-                  <button
-                    onClick={() => remove(item.id)}
-                    className="grid h-9 w-9 place-items-center rounded-xl text-rose-400 hover:bg-rose-500/10"
-                    aria-label="Delete record"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                  <div className="flex gap-1">
+                    <button onClick={() => setEdit(item)} className="grid h-9 w-9 place-items-center rounded-xl accent hover:bg-emerald-500/10" aria-label="Edit record"><Pencil size={16}/></button>
+                    <button onClick={() => remove(item.id)} className="grid h-9 w-9 place-items-center rounded-xl text-rose-400 hover:bg-rose-500/10" aria-label="Delete record"><Trash2 size={16}/></button>
+                  </div>
                 </div>
 
                 <div className={`borrow-status borrow-status-${due.kind} mt-4 rounded-2xl border p-3`}>

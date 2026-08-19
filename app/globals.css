@@ -442,3 +442,10 @@ html.light .borrow-status-today { color:#92400e;background:linear-gradient(135de
 html.light .borrow-status-tomorrow { color:#92400e;background:#fffbeb;border-color:rgba(217,119,6,.25); }
 html.light .borrow-status-settled { color:#047857;background:#ecfdf5;border-color:rgba(5,150,105,.25); }
 html.light .borrow-repay-panel { background:rgba(236,253,245,.75);border-color:rgba(5,150,105,.18)!important; }
+
+/* UX feedback: skeletons + toast */
+@keyframes skeleton-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+.skeleton { border-radius: .8rem; background: linear-gradient(90deg,var(--secondary-bg) 25%,color-mix(in srgb,var(--accent) 12%,var(--secondary-bg)) 50%,var(--secondary-bg) 75%); background-size: 200% 100%; animation: skeleton-shimmer 1.35s linear infinite; }
+.toast-card { position: fixed; right: 1rem; bottom: 6.5rem; z-index: 200; display:flex; align-items:center; gap:.65rem; max-width:min(390px,calc(100vw - 2rem)); padding:.85rem 1rem; border-radius:1rem; border:1px solid var(--line); box-shadow:0 18px 55px var(--shadow); backdrop-filter:blur(18px); font-size:.875rem; font-weight:800; }
+.toast-card button { margin-left:auto; opacity:.7; }.toast-success{background:color-mix(in srgb,var(--panel) 92%,#22c55e 8%);color:var(--text);border-color:color-mix(in srgb,var(--accent) 40%,var(--line));}.toast-error{background:color-mix(in srgb,var(--panel) 90%,#fb7185 10%);color:var(--text);border-color:rgba(251,113,133,.35)}
+@media(min-width:768px){.toast-card{bottom:1.5rem;right:1.5rem}}
