@@ -12,6 +12,7 @@ export default auth((req) => {
     "/scan",
     "/assistant",
     "/income",
+    "/borrow-lend",
     "/settings",
   ]
 
@@ -39,6 +40,7 @@ export const config = {
     "/scan/:path*",
     "/assistant/:path*",
     "/income/:path*",
+    "/borrow-lend/:path*",
     "/settings/:path*",
     "/login",
     "/register",

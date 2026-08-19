@@ -3,7 +3,7 @@
 import AppShell from "@/components/app-shell"
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
-import { Search, Trash2, Plus, Repeat2, ScanLine } from "lucide-react"
+import { Search, Trash2, Plus, Repeat2, ScanLine, HandCoins } from "lucide-react"
 
 type Expense = {
   id: string
@@ -109,6 +109,10 @@ export default function Expenses() {
           <Link href="/recurring" className="btn btn-secondary">
             <Repeat2 size={17} />
             Recurring
+          </Link>
+          <Link href="/borrow-lend" className="btn btn-secondary">
+            <HandCoins size={17} />
+            Borrow/Lend
           </Link>
           <button
             type="button"

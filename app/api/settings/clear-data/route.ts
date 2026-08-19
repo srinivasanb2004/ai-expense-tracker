@@ -14,6 +14,7 @@ export async function DELETE() {
       prisma.income.deleteMany({ where: { userId } }),
       prisma.account.deleteMany({ where: { userId } }),
       prisma.recurringExpense.deleteMany({ where: { userId } }),
+      prisma.borrowLend.deleteMany({ where: { userId } }),
       prisma.notification.deleteMany({ where: { userId } }),
     ])
 

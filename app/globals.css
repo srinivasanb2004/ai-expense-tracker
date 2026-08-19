@@ -410,3 +410,35 @@ html.light .finance-ring {
     opacity: 0.75;
   }
 }
+/* =========================================================
+   BORROW & LEND TRACKER
+========================================================= */
+.borrow-card {
+  border-color: rgba(110,231,183,.34);
+  box-shadow: 0 0 18px rgba(110,231,183,.09), 0 22px 65px var(--shadow);
+}
+.borrow-type {
+  display:inline-flex;align-items:center;padding:.28rem .55rem;border-radius:999px;
+  font-size:.65rem;font-weight:900;letter-spacing:.04em;
+}
+.borrow-type.borrowed { background:rgba(251,113,133,.12); color:#fda4af; border:1px solid rgba(251,113,133,.2); }
+.borrow-type.lent { background:rgba(52,211,153,.12); color:#6ee7b7; border:1px solid rgba(52,211,153,.2); }
+.borrow-status { color:var(--text); background:var(--secondary); border-color:var(--line); }
+.borrow-status-overdue { color:#fecdd3; background:linear-gradient(135deg,rgba(244,63,94,.16),rgba(190,24,93,.07)); border-color:rgba(251,113,133,.48); box-shadow:0 0 18px rgba(244,63,94,.12); }
+.borrow-status-today { color:#fef3c7; background:linear-gradient(135deg,rgba(245,158,11,.17),rgba(217,119,6,.07)); border-color:rgba(251,191,36,.5); box-shadow:0 0 18px rgba(245,158,11,.12); }
+.borrow-status-tomorrow { color:#fde68a; border-color:rgba(251,191,36,.28); background:rgba(245,158,11,.07); }
+.borrow-status-settled { color:#a7f3d0; border-color:rgba(52,211,153,.3); background:rgba(16,185,129,.08); }
+.borrow-repay-panel { border-color:rgba(110,231,183,.2)!important; background:rgba(110,231,183,.035); }
+.borrow-summary-rose svg { color:#fb7185; }
+.borrow-summary-emerald svg { color:#34d399; }
+.borrow-summary-amber svg { color:#fbbf24; }
+.borrow-summary-blue svg { color:#60a5fa; }
+
+html.light .borrow-card { border-color:rgba(5,150,105,.32); background:rgba(255,255,255,.9); box-shadow:0 0 18px rgba(16,185,129,.10),0 18px 50px rgba(23,55,44,.10); }
+html.light .borrow-type.borrowed { background:#fff1f2;color:#be123c;border-color:rgba(225,29,72,.2); }
+html.light .borrow-type.lent { background:#ecfdf5;color:#047857;border-color:rgba(5,150,105,.2); }
+html.light .borrow-status-overdue { color:#9f1239;background:linear-gradient(135deg,#fff1f2,#ffe4e6);border-color:rgba(225,29,72,.42);box-shadow:0 0 17px rgba(225,29,72,.10); }
+html.light .borrow-status-today { color:#92400e;background:linear-gradient(135deg,#fffbeb,#fef3c7);border-color:rgba(217,119,6,.45);box-shadow:0 0 17px rgba(217,119,6,.10); }
+html.light .borrow-status-tomorrow { color:#92400e;background:#fffbeb;border-color:rgba(217,119,6,.25); }
+html.light .borrow-status-settled { color:#047857;background:#ecfdf5;border-color:rgba(5,150,105,.25); }
+html.light .borrow-repay-panel { background:rgba(236,253,245,.75);border-color:rgba(5,150,105,.18)!important; }

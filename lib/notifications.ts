@@ -232,10 +232,72 @@ export async function syncLowBalanceNotification(userId: string, now = new Date(
   )
 }
 
+export async function syncBorrowLendNotifications(userId: string, now = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(now)
+  const year = Number(parts.find((part) => part.type === "year")?.value)
+  const month = Number(parts.find((part) => part.type === "month")?.value)
+  const day = Number(parts.find((part) => part.type === "day")?.value)
+  const todayUtc = Date.UTC(year, month - 1, day)
+
+  const records = await prisma.borrowLend.findMany({
+    where: { userId, status: { not: "SETTLED" }, dueDate: { not: null } },
+    include: { repayments: true },
+  })
+
+  for (const record of records) {
+    if (!record.dueDate) continue
+    const repaid = record.repayments.reduce((sum, item) => sum + Number(item.amount), 0)
+    const remaining = Math.max(Number(record.amount) - repaid, 0)
+    if (remaining <= 0) continue
+
+    const due = new Date(record.dueDate)
+    const dueUtc = Date.UTC(due.getUTCFullYear(), due.getUTCMonth(), due.getUTCDate())
+    const diffDays = Math.round((dueUtc - todayUtc) / 86400000)
+    if (diffDays > 1) continue
+
+    const amount = money(remaining)
+    const dateLabel = due.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" })
+    let title = ""
+    let body = ""
+
+    if (record.type === "BORROWED") {
+      if (diffDays === 1) {
+        title = `Repayment due tomorrow · ${record.person}`
+        body = `You need to repay ${amount} to ${record.person} tomorrow (${dateLabel}).`
+      } else if (diffDays === 0) {
+        title = `Repayment due today · ${record.person}`
+        body = `You need to repay ${amount} to ${record.person} today. Payment is still pending.`
+      } else {
+        const days = Math.abs(diffDays)
+        title = `Repayment pending · ${record.person} · ${days}d overdue`
+        body = `${amount} owed to ${record.person} is overdue by ${days} ${days === 1 ? "day" : "days"}. Please repay it. Due since ${dateLabel}.`
+      }
+    } else {
+      if (diffDays === 1) {
+        title = `Money expected tomorrow · ${record.person}`
+        body = `${amount} lent to ${record.person} is expected tomorrow (${dateLabel}).`
+      } else if (diffDays === 0) {
+        title = `Money expected today · ${record.person}`
+        body = `${amount} from ${record.person} is expected today and is still pending.`
+      } else {
+        const days = Math.abs(diffDays)
+        title = `Money still pending · ${record.person} · ${days}d overdue`
+        body = `${amount} from ${record.person} is overdue by ${days} ${days === 1 ? "day" : "days"}. Due since ${dateLabel}.`
+      }
+    }
+
+    const exists = await prisma.notification.findFirst({ where: { userId, title, body } })
+    if (!exists) await prisma.notification.create({ data: { userId, title, body } })
+  }
+}
+
 export async function syncAllNotifications(userId: string) {
   await syncBudgetNotifications(userId)
   await syncRecurringReminders(userId)
   await syncMonthlySummaryNotification(userId)
   await syncUnusualSpendingNotifications(userId)
   await syncLowBalanceNotification(userId)
+  await syncBorrowLendNotifications(userId)
 }

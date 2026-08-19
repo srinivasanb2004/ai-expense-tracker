@@ -48,3 +48,9 @@ npm run dev
 ```
 
 The Prisma schema already contains the recurring payment and notification models. If your existing Supabase database came from the current project schema, no new model is required for these features.
+
+
+## Borrow & Lend Tracker
+- Track money you borrowed and money you lent without treating loans as normal income/expenses.
+- Due-today and overdue reminders with in-app notifications.
+- Partial repayments, full settlement, optional expense creation for borrowed-money repayments, and person-wise history.

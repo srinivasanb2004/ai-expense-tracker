@@ -14,6 +14,7 @@ import {
   Settings,
   LogOut,
   ArrowUpCircle,
+  HandCoins,
 } from "lucide-react"
 
 import Logo from "./logo"
@@ -22,6 +23,7 @@ const items = [
   ["/dashboard", "Dashboard", LayoutDashboard],
   ["/expenses", "Expenses", ReceiptText],
   ["/recurring", "Recurring Payments", Repeat2],
+  ["/borrow-lend", "Borrow & Lend", HandCoins],
   ["/income", "Income", ArrowUpCircle],
   ["/budgets", "Budgets", WalletCards],
   ["/analytics", "Analytics", ChartNoAxesCombined],
