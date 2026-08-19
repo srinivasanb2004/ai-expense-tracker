@@ -37,7 +37,7 @@ export default async function Dashboard() {
     <AppShell>
       <div><p className="eyebrow">{month}</p>
         <h2 className="text-3xl font-black">
-          <Greeting />
+          <Greeting name={session?.user?.name} />
         </h2>
         <p className="mt-2 text-sm muted">Here&apos;s how your money is moving this month.</p></div>
 
@@ -66,7 +66,11 @@ export default async function Dashboard() {
         </div>
 
         <div className="grid gap-5">
-          <div className="soft-panel"><div className="flex items-center justify-between"><div><p className="eyebrow">Budget</p><h3 className="mt-1 font-black">Monthly health</h3></div><Target className="accent" /></div><div className="progress-track mt-6"><div className="progress-value" style={{ width: `${budgetUsed}%` }} /></div><div className="mt-3 flex justify-between text-xs muted"><span>{money(spent)} spent</span><span>{budget ? `${money(budget)} limit` : "No budget set"}</span></div></div>
+          <div className="soft-panel"><div className="flex items-center justify-between"><div><p className="eyebrow">Budget</p><h3 className="mt-1 font-black">Monthly Budget Overview</h3></div><Target className="accent" /></div><div className="progress-track mt-6"><div className="progress-value" style={{ width: `${budgetUsed}%` }} /></div><div className="mt-3 flex justify-between text-xs muted"><span>{money(spent)} spent</span>
+          <span>
+            {budget ? `${money(budget)} total limit` : "No budget set"}
+          </span></div>
+          </div>
           <div className="insight-card"><div className="flex items-center gap-2"><Sparkles size={17} /><p className="text-xs font-black uppercase tracking-[.16em]">Smart insight</p></div><h3 className="mt-5 text-xl font-black">{top ? `${top[0]} leads your spending.` : "No spending insights yet."}</h3><p className="mt-3 text-sm leading-6 opacity-80">{top ? `You spent ${money(top[1])} on ${top[0]} this month.` : "Add expenses to unlock useful financial insights."}</p><a href="/analytics" className="mt-5 inline-flex items-center gap-2 text-sm font-black">View analytics <ArrowRight size={15} /></a></div>
         </div>
       </section>
