@@ -29,9 +29,32 @@ export default function Topbar() {
 
   useEffect(() => {
     loadNotifications()
-    const timer = setInterval(loadNotifications, 60_000)
-    return () => clearInterval(timer)
   }, [])
+
+  async function toggleNotifications() {
+    const nextOpen = !open
+
+    setOpen(nextOpen)
+
+    if (!nextOpen) {
+      return
+    }
+
+    try {
+      // Generate any new notifications
+      await fetch("/api/notifications", {
+        method: "POST",
+      })
+
+      // Then fetch the updated list
+      await loadNotifications()
+    } catch (error) {
+      console.error(
+        "Notification refresh error:",
+        error
+      )
+    }
+  }
 
   useEffect(() => {
     function close(event: MouseEvent) {
@@ -101,7 +124,7 @@ export default function Topbar() {
           <button
             type="button"
             aria-label="Notifications"
-            onClick={() => setOpen((value) => !value)}
+            onClick={toggleNotifications}
             className="relative grid h-11 w-11 shrink-0 place-items-center rounded-xl border transition hover:-translate-y-0.5"
             style={{ borderColor: "var(--line)", background: "var(--secondary)", color: "var(--text)" }}
           >

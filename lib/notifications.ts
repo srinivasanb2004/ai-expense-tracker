@@ -293,11 +293,15 @@ export async function syncBorrowLendNotifications(userId: string, now = new Date
   }
 }
 
-export async function syncAllNotifications(userId: string) {
-  await syncBudgetNotifications(userId)
-  await syncRecurringReminders(userId)
-  await syncMonthlySummaryNotification(userId)
-  await syncUnusualSpendingNotifications(userId)
-  await syncLowBalanceNotification(userId)
-  await syncBorrowLendNotifications(userId)
+export async function syncAllNotifications(
+  userId: string
+) {
+  await Promise.all([
+    syncBudgetNotifications(userId),
+    syncRecurringReminders(userId),
+    syncMonthlySummaryNotification(userId),
+    syncUnusualSpendingNotifications(userId),
+    syncLowBalanceNotification(userId),
+    syncBorrowLendNotifications(userId),
+  ])
 }
