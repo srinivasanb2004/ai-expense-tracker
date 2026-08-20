@@ -350,7 +350,10 @@ export async function syncBudgetNotifications(
 
 export async function syncRecurringReminders(
   userId: string,
-  now = new Date()
+  now = new Date(),
+  options?: {
+    recurringExpenseId?: string
+  }
 ) {
   /*
     Resolve today using India timezone.
@@ -363,8 +366,6 @@ export async function syncRecurringReminders(
     indiaCalendarUtc(now)
 
   /*
-    Used for duplicate prevention.
-
     Only an identical reminder created
     during the current IST day blocks
     another one.
@@ -373,28 +374,50 @@ export async function syncRecurringReminders(
   const todayStart =
     indiaDayStartUtc(now)
 
+  /*
+    IMPORTANT:
+
+    If recurringExpenseId is provided,
+    only that recurring payment will
+    be processed.
+
+    This is used immediately after
+    creating/editing one recurring
+    payment so unrelated reminders
+    are not generated/sent.
+  */
+
   const recurring =
-    await prisma.recurringExpense.findMany(
-      {
-        where: {
-          userId,
-          active: true,
-        },
+    await prisma.recurringExpense.findMany({
+      where: {
+        userId,
+        active: true,
 
-        orderBy: {
-          nextDate:
-            "asc",
-        },
-      }
-    )
+        ...(options?.recurringExpenseId
+          ? {
+              id:
+                options.recurringExpenseId,
+            }
+          : {}),
+      },
 
-  for (
-    const item of recurring
-  ) {
+      orderBy: {
+        nextDate: "asc",
+      },
+    })
+
+  /*
+    Return the notification IDs that are
+    relevant to this sync operation.
+
+    The caller can then push ONLY these.
+  */
+
+  const notificationIds: string[] = []
+
+  for (const item of recurring) {
     const due =
-      new Date(
-        item.nextDate
-      )
+      new Date(item.nextDate)
 
     /*
       Recurring dates are treated as
@@ -410,8 +433,7 @@ export async function syncRecurringReminders(
 
     const diffDays =
       Math.round(
-        (dueUtc -
-          todayUtc) /
+        (dueUtc - todayUtc) /
           86400000
       )
 
@@ -428,80 +450,82 @@ export async function syncRecurringReminders(
 
     const amount =
       money(
-        Number(
-          item.amount
-        )
+        Number(item.amount)
       )
 
     /*
-      Only start reminders
-      one day before payment.
+      No notification yet if payment
+      is more than one day away.
     */
 
     if (diffDays > 1) {
       continue
     }
 
-    /* ======================
+    /* ====================================
        DUE TOMORROW
-    ====================== */
+    ==================================== */
 
-    if (
-      diffDays === 1
-    ) {
+    if (diffDays === 1) {
       const title =
         `${item.merchant} payment due tomorrow`
 
       const body =
         `${item.merchant} recurring payment of ${amount} is due tomorrow (${dateLabel}).`
 
-      await createOnce(
-        userId,
-        title,
-        body,
-        {
-          since:
-            todayStart,
-        }
+      const notification =
+        await createOnce(
+          userId,
+          title,
+          body,
+          {
+            since:
+              todayStart,
+          }
+        )
+
+      notificationIds.push(
+        notification.id
       )
 
       continue
     }
 
-    /* ======================
+    /* ====================================
        DUE TODAY
-    ====================== */
+    ==================================== */
 
-    if (
-      diffDays === 0
-    ) {
+    if (diffDays === 0) {
       const title =
         `${item.merchant} payment due today`
 
       const body =
         `${item.merchant} payment of ${amount} is due today. Payment is pending — please pay it.`
 
-      await createOnce(
-        userId,
-        title,
-        body,
-        {
-          since:
-            todayStart,
-        }
+      const notification =
+        await createOnce(
+          userId,
+          title,
+          body,
+          {
+            since:
+              todayStart,
+          }
+        )
+
+      notificationIds.push(
+        notification.id
       )
 
       continue
     }
 
-    /* ======================
+    /* ====================================
        OVERDUE
-    ====================== */
+    ==================================== */
 
     const overdueDays =
-      Math.abs(
-        diffDays
-      )
+      Math.abs(diffDays)
 
     const title =
       `${item.merchant} payment pending · ${overdueDays}d overdue`
@@ -513,18 +537,24 @@ export async function syncRecurringReminders(
           : "days"
       }. Please pay it. Due since ${dateLabel}.`
 
-    await createOnce(
-      userId,
-      title,
-      body,
-      {
-        since:
-          todayStart,
-      }
+    const notification =
+      await createOnce(
+        userId,
+        title,
+        body,
+        {
+          since:
+            todayStart,
+        }
+      )
+
+    notificationIds.push(
+      notification.id
     )
   }
-}
 
+  return notificationIds
+}
 /* ========================================
    MONTHLY SUMMARY
 ======================================== */

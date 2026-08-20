@@ -1,28 +1,42 @@
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
-import { syncRecurringReminders } from "@/lib/notifications"
-import { deliverPendingPushes } from "@/lib/push"
-import { NextResponse } from "next/server"
+
+import {
+  syncRecurringReminders,
+} from "@/lib/notifications"
+
+import {
+  deliverNotificationPushes,
+} from "@/lib/push"
+
+import {
+  after,
+  NextResponse,
+} from "next/server"
 
 async function getUserId() {
-  const session = await auth()
+  const session =
+    await auth()
 
-  return (session?.user as any)?.id as
+  return (session?.user as any)
+    ?.id as
     | string
     | undefined
 }
 
-/* =========================
+/* ========================================
    GET RECURRING PAYMENTS
-========================= */
+======================================== */
 
 export async function GET() {
-  const userId = await getUserId()
+  const userId =
+    await getUserId()
 
   if (!userId) {
     return NextResponse.json(
       {
-        error: "Unauthorized",
+        error:
+          "Unauthorized",
       },
       {
         status: 401,
@@ -38,15 +52,22 @@ export async function GET() {
         },
 
         orderBy: {
-          nextDate: "asc",
+          nextDate:
+            "asc",
         },
       })
 
     return NextResponse.json(
-      items.map((item) => ({
-        ...item,
-        amount: Number(item.amount),
-      }))
+      items.map(
+        (item) => ({
+          ...item,
+
+          amount:
+            Number(
+              item.amount
+            ),
+        })
+      )
     )
   } catch (error) {
     console.error(
@@ -66,17 +87,21 @@ export async function GET() {
   }
 }
 
-/* =========================
+/* ========================================
    CREATE RECURRING PAYMENT
-========================= */
+======================================== */
 
-export async function POST(req: Request) {
-  const userId = await getUserId()
+export async function POST(
+  req: Request
+) {
+  const userId =
+    await getUserId()
 
   if (!userId) {
     return NextResponse.json(
       {
-        error: "Unauthorized",
+        error:
+          "Unauthorized",
       },
       {
         status: 401,
@@ -85,9 +110,13 @@ export async function POST(req: Request) {
   }
 
   try {
-    const body = await req.json()
+    const body =
+      await req.json()
 
-    const amount = Number(body.amount)
+    const amount =
+      Number(
+        body.amount
+      )
 
     if (
       !body.merchant ||
@@ -95,7 +124,9 @@ export async function POST(req: Request) {
       !body.paymentMethod ||
       !body.frequency ||
       !body.nextDate ||
-      !Number.isFinite(amount) ||
+      !Number.isFinite(
+        amount
+      ) ||
       amount <= 0
     ) {
       return NextResponse.json(
@@ -109,9 +140,10 @@ export async function POST(req: Request) {
       )
     }
 
-    const nextDate = new Date(
-      body.nextDate
-    )
+    const nextDate =
+      new Date(
+        body.nextDate
+      )
 
     if (
       Number.isNaN(
@@ -129,65 +161,120 @@ export async function POST(req: Request) {
       )
     }
 
+    /*
+      FIRST:
+      Save recurring payment.
+
+      We do NOT make the user wait for
+      Firebase before returning success.
+    */
+
     const item =
       await prisma.recurringExpense.create({
         data: {
           userId,
 
-          merchant: String(
-            body.merchant
-          ),
+          merchant:
+            String(
+              body.merchant
+            ),
 
           amount,
 
-          category: String(
-            body.category
-          ),
+          category:
+            String(
+              body.category
+            ),
 
-          paymentMethod: String(
-            body.paymentMethod
-          ),
+          paymentMethod:
+            String(
+              body.paymentMethod
+            ),
 
-          frequency: String(
-            body.frequency
-          ),
+          frequency:
+            String(
+              body.frequency
+            ),
 
           nextDate,
 
           active:
-            body.active !== false,
+            body.active !==
+            false,
         },
       })
 
-    /* =====================================
-       IMMEDIATE NOTIFICATION + PUSH
+    /*
+      AFTER RESPONSE:
 
-       Due today / tomorrow:
-       create in-app reminder
-       then send Firebase push immediately
-    ===================================== */
+      Only process THIS recurring payment.
 
-    try {
-      await syncRecurringReminders(
-        userId
-      )
+      Example:
 
-      await deliverPendingPushes(
-        userId
-      )
-    } catch (error) {
-      console.error(
-        "Immediate recurring push error:",
-        error
-      )
-    }
+      User creates:
+      Netflix - due today
+
+             ↓
+
+      Only Netflix reminder is generated
+
+             ↓
+
+      Only Netflix notification ID
+      is sent to Firebase
+
+             ↓
+
+      Old pending notifications are NOT
+      flushed.
+    */
+
+    after(async () => {
+      try {
+        const notificationIds =
+          await syncRecurringReminders(
+            userId,
+            new Date(),
+            {
+              recurringExpenseId:
+                item.id,
+            }
+          )
+
+        if (
+          notificationIds.length
+        ) {
+          await deliverNotificationPushes(
+            userId,
+            notificationIds
+          )
+        }
+      } catch (error) {
+        /*
+          Notification failure must NEVER
+          make recurring creation fail.
+        */
+
+        console.error(
+          "Immediate recurring notification error:",
+          error
+        )
+      }
+    })
+
+    /*
+      Response is returned without waiting
+      for Firebase push delivery.
+    */
 
     return NextResponse.json(
       {
         ...item,
-        amount: Number(
-          item.amount
-        ),
+
+        amount:
+          Number(
+            item.amount
+          ),
       },
       {
         status: 201,
