@@ -8,10 +8,7 @@ import {
 
 import { deliverPendingPushes } from "@/lib/push"
 
-import {
-  after,
-  NextResponse,
-} from "next/server"
+import { NextResponse } from "next/server"
 
 async function getUserId() {
   const session = await auth()
@@ -28,12 +25,8 @@ function advanceDate(
   const next = new Date(date)
 
   if (frequency === "Weekly") {
-    next.setDate(
-      next.getDate() + 7
-    )
-  } else if (
-    frequency === "Yearly"
-  ) {
+    next.setDate(next.getDate() + 7)
+  } else if (frequency === "Yearly") {
     next.setFullYear(
       next.getFullYear() + 1
     )
@@ -50,28 +43,23 @@ function advanceDate(
    IMMEDIATE RECURRING PUSH SYNC
 ======================================== */
 
-function triggerRecurringPush(
+async function triggerRecurringPush(
   userId: string
 ) {
-  after(async () => {
-    try {
-      // Create/update due reminders
-      await syncRecurringReminders(
-        userId
-      )
+  try {
+    await syncRecurringReminders(
+      userId
+    )
 
-      // Deliver any pending reminder
-      // immediately through Firebase
-      await deliverPendingPushes(
-        userId
-      )
-    } catch (error) {
-      console.error(
-        "Recurring push sync error:",
-        error
-      )
-    }
-  })
+    await deliverPendingPushes(
+      userId
+    )
+  } catch (error) {
+    console.error(
+      "Recurring push sync error:",
+      error
+    )
+  }
 }
 
 /* ========================================
@@ -103,8 +91,7 @@ export async function DELETE(
   }
 
   try {
-    const { id } =
-      await params
+    const { id } = await params
 
     await prisma.recurringExpense.deleteMany(
       {
@@ -165,8 +152,7 @@ export async function PATCH(
   }
 
   try {
-    const { id } =
-      await params
+    const { id } = await params
 
     const body = await req
       .json()
@@ -210,9 +196,7 @@ export async function PATCH(
         !body.paymentMethod ||
         !body.frequency ||
         !body.nextDate ||
-        !Number.isFinite(
-          amount
-        ) ||
+        !Number.isFinite(amount) ||
         amount <= 0
       ) {
         return NextResponse.json(
@@ -227,9 +211,7 @@ export async function PATCH(
       }
 
       const nextDate =
-        new Date(
-          body.nextDate
-        )
+        new Date(body.nextDate)
 
       if (
         Number.isNaN(
@@ -280,22 +262,12 @@ export async function PATCH(
         )
 
       /*
-       Example:
-
-       Netflix originally:
-       Due next week
-
-       User edits:
-       Due today
-
-              ↓
-
-       Reminder generated
-              ↓
-       Push sent immediately
+       If user edits a future payment
+       to today / tomorrow / overdue,
+       generate and send push immediately.
       */
 
-      triggerRecurringPush(
+      await triggerRecurringPush(
         userId
       )
 
@@ -312,8 +284,7 @@ export async function PATCH(
     ==================================== */
 
     if (
-      body.action ===
-      "mark_paid"
+      body.action === "mark_paid"
     ) {
       const nextDate =
         advanceDate(
@@ -344,7 +315,8 @@ export async function PATCH(
                   date:
                     new Date(),
 
-                  notes: `Recurring ${item.frequency.toLowerCase()} payment`,
+                  notes:
+                    `Recurring ${item.frequency.toLowerCase()} payment`,
                 },
               }
             ),
@@ -364,9 +336,8 @@ export async function PATCH(
         )
 
       /*
-       Remove stale due/overdue bell
-       notifications for the payment
-       that was just paid.
+       Remove stale unread reminders
+       for the payment that was paid.
       */
 
       await prisma.notification.updateMany(
@@ -389,33 +360,28 @@ export async function PATCH(
       )
 
       /*
-       Payment created an Expense.
+       Recalculate budget / balance /
+       recurring notifications.
 
-       Re-check things such as:
-       - budgets
-       - low balance
-       - recurring reminders
-
-       Then immediately send any
-       newly generated push alerts.
+       If marking this payment as paid
+       creates a new budget warning,
+       deliver it immediately.
       */
 
-      after(async () => {
-        try {
-          await syncAllNotifications(
-            userId
-          )
+      try {
+        await syncAllNotifications(
+          userId
+        )
 
-          await deliverPendingPushes(
-            userId
-          )
-        } catch (error) {
-          console.error(
-            "Post-payment notification error:",
-            error
-          )
-        }
-      })
+        await deliverPendingPushes(
+          userId
+        )
+      } catch (error) {
+        console.error(
+          "Post-payment notification error:",
+          error
+        )
+      }
 
       return NextResponse.json({
         ...updated,
@@ -448,14 +414,13 @@ export async function PATCH(
       )
 
     /*
-     Important when reactivating something
-     that is already due today/overdue.
+     If a payment is reactivated and
+     it's already due today / tomorrow /
+     overdue, push immediately.
     */
 
-    if (
-      updated.active
-    ) {
-      triggerRecurringPush(
+    if (updated.active) {
+      await triggerRecurringPush(
         userId
       )
     }

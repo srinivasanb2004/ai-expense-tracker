@@ -2,7 +2,7 @@ import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { syncRecurringReminders } from "@/lib/notifications"
 import { deliverPendingPushes } from "@/lib/push"
-import { after, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 
 async function getUserId() {
   const session = await auth()
@@ -160,34 +160,27 @@ export async function POST(req: Request) {
       })
 
     /* =====================================
-       SYNC + IMMEDIATELY DELIVER PUSH
+       IMMEDIATE NOTIFICATION + PUSH
 
-       Example:
-       Netflix is due today
-               ↓
-       Create in-app reminder
-               ↓
-       Find pending push
-               ↓
-       Send through Firebase
+       Due today / tomorrow:
+       create in-app reminder
+       then send Firebase push immediately
     ===================================== */
 
-    after(async () => {
-      try {
-        await syncRecurringReminders(
-          userId
-        )
+    try {
+      await syncRecurringReminders(
+        userId
+      )
 
-        await deliverPendingPushes(
-          userId
-        )
-      } catch (error) {
-        console.error(
-          "Recurring notification/push error:",
-          error
-        )
-      }
-    })
+      await deliverPendingPushes(
+        userId
+      )
+    } catch (error) {
+      console.error(
+        "Immediate recurring push error:",
+        error
+      )
+    }
 
     return NextResponse.json(
       {
