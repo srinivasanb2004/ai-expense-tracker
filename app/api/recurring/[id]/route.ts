@@ -6,14 +6,22 @@ import {
   syncRecurringReminders,
 } from "@/lib/notifications"
 
-import { deliverPendingPushes } from "@/lib/push"
+import {
+  deliverNotificationPushes,
+  deliverPendingPushes,
+} from "@/lib/push"
 
-import { NextResponse } from "next/server"
+import {
+  after,
+  NextResponse,
+} from "next/server"
 
 async function getUserId() {
-  const session = await auth()
+  const session =
+    await auth()
 
-  return (session?.user as any)?.id as
+  return (session?.user as any)
+    ?.id as
     | string
     | undefined
 }
@@ -25,8 +33,12 @@ function advanceDate(
   const next = new Date(date)
 
   if (frequency === "Weekly") {
-    next.setDate(next.getDate() + 7)
-  } else if (frequency === "Yearly") {
+    next.setDate(
+      next.getDate() + 7
+    )
+  } else if (
+    frequency === "Yearly"
+  ) {
     next.setFullYear(
       next.getFullYear() + 1
     )
@@ -40,26 +52,39 @@ function advanceDate(
 }
 
 /* ========================================
-   IMMEDIATE RECURRING PUSH SYNC
+   TARGETED RECURRING PUSH
 ======================================== */
 
-async function triggerRecurringPush(
-  userId: string
+function queueRecurringPush(
+  userId: string,
+  recurringExpenseId: string
 ) {
-  try {
-    await syncRecurringReminders(
-      userId
-    )
+  after(async () => {
+    try {
+      const notificationIds =
+        await syncRecurringReminders(
+          userId,
+          new Date(),
+          {
+            recurringExpenseId,
+          }
+        )
 
-    await deliverPendingPushes(
-      userId
-    )
-  } catch (error) {
-    console.error(
-      "Recurring push sync error:",
-      error
-    )
-  }
+      if (
+        notificationIds.length
+      ) {
+        await deliverNotificationPushes(
+          userId,
+          notificationIds
+        )
+      }
+    } catch (error) {
+      console.error(
+        "Recurring targeted push error:",
+        error
+      )
+    }
+  })
 }
 
 /* ========================================
@@ -82,7 +107,8 @@ export async function DELETE(
   if (!userId) {
     return NextResponse.json(
       {
-        error: "Unauthorized",
+        error:
+          "Unauthorized",
       },
       {
         status: 401,
@@ -91,16 +117,17 @@ export async function DELETE(
   }
 
   try {
-    const { id } = await params
+    const { id } =
+      await params
 
-    await prisma.recurringExpense.deleteMany(
-      {
+    await prisma
+      .recurringExpense
+      .deleteMany({
         where: {
           id,
           userId,
         },
-      }
-    )
+      })
 
     return NextResponse.json({
       success: true,
@@ -124,7 +151,7 @@ export async function DELETE(
 }
 
 /* ========================================
-   EDIT / MARK PAID / TOGGLE ACTIVE
+   PATCH
 ======================================== */
 
 export async function PATCH(
@@ -143,7 +170,8 @@ export async function PATCH(
   if (!userId) {
     return NextResponse.json(
       {
-        error: "Unauthorized",
+        error:
+          "Unauthorized",
       },
       {
         status: 401,
@@ -152,21 +180,25 @@ export async function PATCH(
   }
 
   try {
-    const { id } = await params
+    const { id } =
+      await params
 
-    const body = await req
-      .json()
-      .catch(() => ({}))
+    const body =
+      await req
+        .json()
+        .catch(
+          () => ({})
+        )
 
     const item =
-      await prisma.recurringExpense.findFirst(
-        {
+      await prisma
+        .recurringExpense
+        .findFirst({
           where: {
             id,
             userId,
           },
-        }
-      )
+        })
 
     if (!item) {
       return NextResponse.json(
@@ -185,10 +217,13 @@ export async function PATCH(
     ==================================== */
 
     if (
-      body.action === "edit"
+      body.action ===
+      "edit"
     ) {
       const amount =
-        Number(body.amount)
+        Number(
+          body.amount
+        )
 
       if (
         !body.merchant ||
@@ -196,7 +231,9 @@ export async function PATCH(
         !body.paymentMethod ||
         !body.frequency ||
         !body.nextDate ||
-        !Number.isFinite(amount) ||
+        !Number.isFinite(
+          amount
+        ) ||
         amount <= 0
       ) {
         return NextResponse.json(
@@ -211,7 +248,9 @@ export async function PATCH(
       }
 
       const nextDate =
-        new Date(body.nextDate)
+        new Date(
+          body.nextDate
+        )
 
       if (
         Number.isNaN(
@@ -230,61 +269,74 @@ export async function PATCH(
       }
 
       const updated =
-        await prisma.recurringExpense.update(
-          {
+        await prisma
+          .recurringExpense
+          .update({
             where: {
               id,
             },
 
             data: {
-              merchant: String(
-                body.merchant
-              ),
+              merchant:
+                String(
+                  body.merchant
+                ),
 
               amount,
 
-              category: String(
-                body.category
-              ),
+              category:
+                String(
+                  body.category
+                ),
 
               paymentMethod:
                 String(
                   body.paymentMethod
                 ),
 
-              frequency: String(
-                body.frequency
-              ),
+              frequency:
+                String(
+                  body.frequency
+                ),
 
               nextDate,
             },
-          }
-        )
+          })
 
       /*
-       If user edits a future payment
-       to today / tomorrow / overdue,
-       generate and send push immediately.
+        IMPORTANT:
+
+        Return updated recurring payment
+        without waiting for Firebase.
+
+        Background task only processes
+        THIS recurring item.
       */
 
-      await triggerRecurringPush(
-        userId
+      queueRecurringPush(
+        userId,
+        updated.id
       )
 
-      return NextResponse.json({
-        ...updated,
-        amount: Number(
-          updated.amount
-        ),
-      })
+      return NextResponse.json(
+        {
+          ...updated,
+
+          amount:
+            Number(
+              updated.amount
+            ),
+        }
+      )
     }
 
     /* ====================================
-       MARK PAYMENT AS PAID
+       MARK PAID
     ==================================== */
 
     if (
-      body.action === "mark_paid"
+      body.action ===
+      "mark_paid"
     ) {
       const nextDate =
         advanceDate(
@@ -292,113 +344,112 @@ export async function PATCH(
           item.frequency
         )
 
-      const [, updated] =
-        await prisma.$transaction(
-          [
-            prisma.expense.create(
-              {
-                data: {
-                  userId,
+      const [
+        ,
+        updated,
+      ] =
+        await prisma
+          .$transaction([
+            prisma.expense.create({
+              data: {
+                userId,
 
-                  merchant:
-                    item.merchant,
+                merchant:
+                  item.merchant,
 
-                  amount:
-                    item.amount,
+                amount:
+                  item.amount,
 
-                  category:
-                    item.category,
+                category:
+                  item.category,
 
-                  paymentMethod:
-                    item.paymentMethod,
+                paymentMethod:
+                  item.paymentMethod,
 
-                  date:
-                    new Date(),
+                date:
+                  new Date(),
 
-                  notes:
-                    `Recurring ${item.frequency.toLowerCase()} payment`,
-                },
-              }
-            ),
+                notes:
+                  `Recurring ${item.frequency.toLowerCase()} payment`,
+              },
+            }),
 
-            prisma.recurringExpense.update(
-              {
-                where: {
-                  id,
-                },
+            prisma.recurringExpense.update({
+              where: {
+                id,
+              },
 
-                data: {
-                  nextDate,
-                },
-              }
-            ),
-          ]
-        )
+              data: {
+                nextDate,
+              },
+            }),
+          ])
 
       /*
-       Remove stale unread reminders
-       for the payment that was paid.
+        Clear old unread payment reminders.
       */
 
-      await prisma.notification.updateMany(
+      await prisma.notification.updateMany({
+        where: {
+          userId,
+
+          read: false,
+
+          title: {
+            startsWith:
+              `${item.merchant} payment`,
+          },
+        },
+
+        data: {
+          read: true,
+        },
+      })
+
+      /*
+        Do NOT make UI wait for all
+        notification syncing.
+
+        Run general sync after response.
+      */
+
+      after(async () => {
+        try {
+          await syncAllNotifications(
+            userId
+          )
+
+          await deliverPendingPushes(
+            userId
+          )
+        } catch (error) {
+          console.error(
+            "Post-payment notification error:",
+            error
+          )
+        }
+      })
+
+      return NextResponse.json(
         {
-          where: {
-            userId,
+          ...updated,
 
-            read: false,
-
-            title: {
-              startsWith:
-                `${item.merchant} payment`,
-            },
-          },
-
-          data: {
-            read: true,
-          },
+          amount:
+            Number(
+              updated.amount
+            ),
         }
       )
-
-      /*
-       Recalculate budget / balance /
-       recurring notifications.
-
-       If marking this payment as paid
-       creates a new budget warning,
-       deliver it immediately.
-      */
-
-      try {
-        await syncAllNotifications(
-          userId
-        )
-
-        await deliverPendingPushes(
-          userId
-        )
-      } catch (error) {
-        console.error(
-          "Post-payment notification error:",
-          error
-        )
-      }
-
-      return NextResponse.json({
-        ...updated,
-
-        amount: Number(
-          updated.amount
-        ),
-      })
     }
 
     /* ====================================
-       ACTIVE / PAUSED
+       PAUSE / RESUME
     ==================================== */
 
     const updated =
-      await prisma.recurringExpense.update(
-        {
+      await prisma
+        .recurringExpense
+        .update({
           where: {
             id,
           },
@@ -410,28 +461,32 @@ export async function PATCH(
                 ? body.active
                 : item.active,
           },
-        }
-      )
+        })
 
     /*
-     If a payment is reactivated and
-     it's already due today / tomorrow /
-     overdue, push immediately.
+      Only when resumed:
+      check this specific recurring item.
     */
 
-    if (updated.active) {
-      await triggerRecurringPush(
-        userId
+    if (
+      updated.active
+    ) {
+      queueRecurringPush(
+        userId,
+        updated.id
       )
     }
 
-    return NextResponse.json({
-      ...updated,
+    return NextResponse.json(
+      {
+        ...updated,
 
-      amount: Number(
-        updated.amount
-      ),
-    })
+        amount:
+          Number(
+            updated.amount
+          ),
+      }
+    )
   } catch (error) {
     console.error(
       "Update recurring payment error:",
