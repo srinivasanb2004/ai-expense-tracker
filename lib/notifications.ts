@@ -230,7 +230,10 @@ export async function createReceiptSavedNotification(
 
 export async function syncBudgetNotifications(
   userId: string,
-  now = new Date()
+  now = new Date(),
+  options?: {
+    category?: string
+  }
 ) {
   const {
     start,
@@ -243,6 +246,13 @@ export async function syncBudgetNotifications(
   const year =
     now.getFullYear()
 
+  /*
+    When an expense is added/edited,
+    we can check only that expense category.
+
+    Cron / syncAllNotifications can still
+    call this without category to check all.
+  */
   const [
     budgets,
     expenses,
@@ -253,6 +263,13 @@ export async function syncBudgetNotifications(
           userId,
           month,
           year,
+
+          ...(options?.category
+            ? {
+                category:
+                  options.category,
+              }
+            : {}),
         },
       }),
 
@@ -264,9 +281,25 @@ export async function syncBudgetNotifications(
             gte: start,
             lt: end,
           },
+
+          ...(options?.category
+            ? {
+                category:
+                  options.category,
+              }
+            : {}),
         },
       }),
     ])
+
+  /*
+    Only NEW notification IDs are returned.
+
+    This prevents an old unsent warning
+    from suddenly being pushed when a new
+    expense is added.
+  */
+  const notificationIds: string[] = []
 
   for (
     const budget of budgets
@@ -296,25 +329,35 @@ export async function syncBudgetNotifications(
       continue
     }
 
-    /* Budget exceeded */
+    let title:
+      | string
+      | null =
+      null
 
-    if (spent > limit) {
-      await createOnce(
-        userId,
+    let body:
+      | string
+      | null =
+      null
 
-        `${budget.category} budget exceeded`,
+    /* ====================================
+       BUDGET EXCEEDED
+    ==================================== */
 
+    if (
+      spent > limit
+    ) {
+      title =
+        `${budget.category} budget exceeded`
+
+      body =
         `You exceeded your ${budget.category} budget by ${money(
           spent - limit
-        )}.`,
-
-        {
-          since: start,
-        }
-      )
+        )}.`
     }
 
-    /* 90% budget warning */
+    /* ====================================
+       90% WARNING
+    ==================================== */
 
     else if (
       spent >=
@@ -327,21 +370,74 @@ export async function syncBudgetNotifications(
             100
         )
 
-      await createOnce(
-        userId,
+      title =
+        `${budget.category} budget almost reached`
 
-        `${budget.category} budget almost reached`,
-
+      body =
         `You've used ${used}% of your ${money(
           limit
-        )} ${budget.category} budget.`,
+        )} ${budget.category} budget.`
+    }
 
+    /*
+      Below 90% = nothing to notify.
+    */
+
+    if (
+      !title ||
+      !body
+    ) {
+      continue
+    }
+
+    /*
+      Check if this warning already exists
+      for the current month.
+
+      Important:
+      If it already exists, DO NOT return
+      its ID for immediate push.
+    */
+
+    const existing =
+      await prisma.notification.findFirst(
         {
-          since: start,
+          where: {
+            userId,
+            title,
+
+            createdAt: {
+              gte: start,
+            },
+          },
         }
       )
+
+    if (existing) {
+      continue
     }
+
+    /*
+      Create a genuinely new warning.
+    */
+
+    const notification =
+      await prisma.notification.create(
+        {
+          data: {
+            userId,
+            title,
+            body,
+          },
+        }
+      )
+
+    notificationIds.push(
+      notification.id
+    )
   }
+
+  return notificationIds
 }
 
 /* ========================================
