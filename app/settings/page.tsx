@@ -2,6 +2,7 @@
 
 import AppShell from "@/components/app-shell"
 import MobileNotifications from "@/components/mobile-notifications"
+import PushNotificationsSettings from "@/components/push-notifications-settings"
 import Toast, { ToastState } from "@/components/toast"
 
 import {
@@ -431,6 +432,9 @@ export default function Settings() {
 
       {/* Mobile notifications */}
       <MobileNotifications />
+
+      {/* Device push notifications */}
+      <PushNotificationsSettings />
 
       {/* Account / Logout */}
       <div className="soft-panel mt-8">
