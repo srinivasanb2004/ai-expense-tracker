@@ -449,3 +449,138 @@ html.light .borrow-repay-panel { background:rgba(236,253,245,.75);border-color:r
 .toast-card { position: fixed; right: 1rem; bottom: 6.5rem; z-index: 200; display:flex; align-items:center; gap:.65rem; max-width:min(390px,calc(100vw - 2rem)); padding:.85rem 1rem; border-radius:1rem; border:1px solid var(--line); box-shadow:0 18px 55px var(--shadow); backdrop-filter:blur(18px); font-size:.875rem; font-weight:800; }
 .toast-card button { margin-left:auto; opacity:.7; }.toast-success{background:color-mix(in srgb,var(--panel) 92%,#22c55e 8%);color:var(--text);border-color:color-mix(in srgb,var(--accent) 40%,var(--line));}.toast-error{background:color-mix(in srgb,var(--panel) 90%,#fb7185 10%);color:var(--text);border-color:rgba(251,113,133,.35)}
 @media(min-width:768px){.toast-card{bottom:1.5rem;right:1.5rem}}
+
+/* =========================================================
+   GLOBAL CLICKABLE CURSORS
+   Makes every interactive element show pointer cursor
+========================================================= */
+
+a,
+button,
+[role="button"],
+summary,
+select,
+input[type="checkbox"],
+input[type="radio"],
+label[for] {
+  cursor: pointer;
+}
+
+/* Disabled controls */
+button:disabled,
+select:disabled,
+input:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed !important;
+}
+
+/* =========================================================
+   NETWORK / OFFLINE STATUS
+========================================================= */
+
+.network-banner {
+  position: relative;
+  z-index: 50;
+  width: 100%;
+  border-bottom: 1px solid var(--line);
+}
+
+.network-banner-inner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+
+  width: 100%;
+  max-width: 1500px;
+
+  margin: 0 auto;
+  padding: 0.75rem 1rem;
+
+  font-size: 0.8rem;
+}
+
+/* Offline */
+
+.network-banner-offline {
+  color: #fecdd3;
+
+  border-color: rgba(244, 63, 94, 0.25);
+
+  background:
+    linear-gradient(
+      90deg,
+      rgba(244, 63, 94, 0.12),
+      rgba(190, 24, 93, 0.06)
+    );
+}
+
+/* Back online */
+
+.network-banner-online {
+  color: #a7f3d0;
+
+  border-color: rgba(52, 211, 153, 0.25);
+
+  background:
+    linear-gradient(
+      90deg,
+      rgba(16, 185, 129, 0.13),
+      rgba(34, 197, 94, 0.06)
+    );
+}
+
+.network-banner button {
+  display: grid;
+
+  width: 30px;
+  height: 30px;
+
+  flex-shrink: 0;
+
+  place-items: center;
+
+  border: 0;
+  border-radius: 9px;
+
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+
+  cursor: pointer;
+}
+
+/* Light mode */
+
+html.light .network-banner-offline {
+  color: #9f1239;
+
+  border-color: rgba(225, 29, 72, 0.2);
+
+  background:
+    linear-gradient(
+      90deg,
+      #fff1f2,
+      #fff7f7
+    );
+}
+
+html.light .network-banner-online {
+  color: #047857;
+
+  border-color: rgba(5, 150, 105, 0.2);
+
+  background:
+    linear-gradient(
+      90deg,
+      #ecfdf5,
+      #f0fdf4
+    );
+}
+
+/* Desktop */
+
+@media (min-width: 768px) {
+  .network-banner-inner {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}

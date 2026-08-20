@@ -1,6 +1,5 @@
 import Link from "next/link"
 import Logo from "@/components/logo"
-import { auth } from "@/auth"
 
 import {
   ArrowRight,
@@ -9,20 +8,14 @@ import {
   ChartPie,
 } from "lucide-react"
 
-export default async function Home() {
-  const session = await auth()
-
-  const getStartedHref = session?.user
-    ? "/dashboard"
-    : "/register"
-
+export default function Home() {
   return (
     <main className="min-h-screen">
       <nav className="mx-auto flex max-w-7xl items-center justify-between gap-3 p-5 sm:p-6">
         <Logo />
 
         <div className="flex gap-2">
-          {/* Login should always open login */}
+          {/* Always open Login */}
           <Link
             className="btn btn-secondary"
             href="/login"
@@ -30,13 +23,15 @@ export default async function Home() {
             Login
           </Link>
 
-          {/* Get Started depends on session */}
-          <Link
+          {/* Always try Dashboard.
+              If logged in -> Dashboard
+              If logged out -> protected route redirects to Login */}
+          <a
             className="btn btn-primary"
-            href={getStartedHref}
+            href="/dashboard"
           >
             Get started
-          </Link>
+          </a>
         </div>
       </nav>
 
@@ -60,7 +55,7 @@ export default async function Home() {
           </p>
 
           <div className="mt-8 flex flex-wrap gap-3">
-            {/* Same smart behavior as Get Started */}
+            {/* Always Register */}
             <Link
               href="/register"
               className="btn btn-primary"
@@ -69,7 +64,7 @@ export default async function Home() {
               <ArrowRight size={18} />
             </Link>
 
-            {/* Always open login page */}
+            {/* Always Login */}
             <Link
               href="/login"
               className="btn btn-secondary"
@@ -97,22 +92,26 @@ export default async function Home() {
                 "Analytics",
                 "Trends, categories, savings and merchants",
               ],
-            ].map(([Icon, title, description]: any) => (
-              <div
-                key={title}
-                className="stat-card"
-              >
-                <Icon className="accent" />
+            ].map(
+              (
+                [Icon, title, description]: any
+              ) => (
+                <div
+                  key={title}
+                  className="stat-card"
+                >
+                  <Icon className="accent" />
 
-                <h3 className="mt-8 font-bold">
-                  {title}
-                </h3>
+                  <h3 className="mt-8 font-bold">
+                    {title}
+                  </h3>
 
-                <p className="mt-2 text-sm muted">
-                  {description}
-                </p>
-              </div>
-            ))}
+                  <p className="mt-2 text-sm muted">
+                    {description}
+                  </p>
+                </div>
+              )
+            )}
           </div>
 
           <div className="mt-5 rounded-2xl border border-emerald-300/20 bg-emerald-300/10 p-6">
@@ -125,8 +124,9 @@ export default async function Home() {
             </p>
 
             <p className="mt-3 text-sm muted">
-              Only the expenses, income and budgets
-              you add will appear in your account.
+              Only the expenses, income and
+              budgets you add will appear in
+              your account.
             </p>
           </div>
         </div>

@@ -1,5 +1,6 @@
 import Sidebar from "./sidebar"
 import Topbar from "./topbar"
+import NetworkStatus from "./network-status"
 
 export default function AppShell({
   children,
@@ -32,6 +33,9 @@ export default function AppShell({
 
         <div className="min-h-screen md:pl-72">
           <Topbar />
+
+          {/* Global network status */}
+          <NetworkStatus />
 
           <main className="relative mx-auto max-w-[1500px] px-4 pb-28 pt-5 sm:px-6 md:px-8 md:pb-10 md:pt-7">
             {children}

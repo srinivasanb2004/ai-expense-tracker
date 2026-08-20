@@ -1,7 +1,7 @@
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { syncAllNotifications } from "@/lib/notifications"
-import { NextResponse } from "next/server"
+import { after, NextResponse } from "next/server"
 
 async function getUserId() {
   const session = await auth()
@@ -68,7 +68,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       data: { read: true },
     })
 
-    await syncAllNotifications(userId)
+    after(() => syncAllNotifications(userId).catch((error) => console.error("Recurring notification sync error:", error)))
     return NextResponse.json({ ...updated, amount: Number(updated.amount) })
   }
 

@@ -1,7 +1,7 @@
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { syncRecurringReminders } from "@/lib/notifications"
-import { NextResponse } from "next/server"
+import { after, NextResponse } from "next/server"
 
 async function getUserId() {
   const session = await auth()
@@ -12,7 +12,6 @@ export async function GET() {
   const userId = await getUserId()
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  await syncRecurringReminders(userId)
   const items = await prisma.recurringExpense.findMany({ where: { userId }, orderBy: { nextDate: "asc" } })
   return NextResponse.json(items.map((item) => ({ ...item, amount: Number(item.amount) })))
 }
@@ -41,7 +40,7 @@ export async function POST(req: Request) {
       },
     })
 
-    await syncRecurringReminders(userId)
+    after(() => syncRecurringReminders(userId).catch((error) => console.error("Recurring notification sync error:", error)))
     return NextResponse.json({ ...item, amount: Number(item.amount) }, { status: 201 })
   } catch (error) {
     console.error("Create recurring payment error:", error)

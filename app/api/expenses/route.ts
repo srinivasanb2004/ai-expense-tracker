@@ -1,7 +1,7 @@
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { createReceiptSavedNotification, syncAllNotifications } from "@/lib/notifications"
-import { NextResponse } from "next/server"
+import { after, NextResponse } from "next/server"
 
 async function getUserId() {
   const session = await auth()
@@ -40,11 +40,16 @@ export async function POST(req: Request) {
       },
     })
 
-    if (body.source === "receipt_scan") {
-      await createReceiptSavedNotification(userId, expense.merchant, amount)
-    }
-
-    await syncAllNotifications(userId)
+    after(async () => {
+      try {
+        if (body.source === "receipt_scan") {
+          await createReceiptSavedNotification(userId, expense.merchant, amount)
+        }
+        await syncAllNotifications(userId)
+      } catch (error) {
+        console.error("Expense notification sync error:", error)
+      }
+    })
 
     return NextResponse.json({ ...expense, amount: Number(expense.amount) }, { status: 201 })
   } catch (error) {

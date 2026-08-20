@@ -1,7 +1,7 @@
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { syncBorrowLendNotifications } from "@/lib/notifications"
-import { NextResponse } from "next/server"
+import { after, NextResponse } from "next/server"
 
 async function userId() {
   const session = await auth()
@@ -24,7 +24,6 @@ export async function GET() {
   const id = await userId()
   if (!id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  await syncBorrowLendNotifications(id)
   const records = await prisma.borrowLend.findMany({
     where: { userId: id },
     include: { repayments: { orderBy: { date: "desc" } } },
@@ -59,7 +58,7 @@ export async function POST(req: Request) {
       include: { repayments: true },
     })
 
-    await syncBorrowLendNotifications(id)
+    after(() => syncBorrowLendNotifications(id).catch((error) => console.error("Borrow/Lend notification sync error:", error)))
     return NextResponse.json(serialize(record), { status: 201 })
   } catch (error) {
     console.error("Create borrow/lend record error:", error)

@@ -1,12 +1,682 @@
 "use client"
-import AppShell from "@/components/app-shell";import Toast,{ToastState} from "@/components/toast";import Link from "next/link";import {useEffect,useMemo,useState} from "react";import {Search,Trash2,Plus,Repeat2,ScanLine,HandCoins,Pencil,ReceiptText} from "lucide-react"
-type E={id:string;amount:number;merchant:string;category:string;paymentMethod:string;date:string;notes?:string};const cats=["Food","Transport","Shopping","Bills","Health","Entertainment","Education","Other"],payments=["UPI","Card","Cash","Bank Transfer"]
-const dateInput=(s:string)=>new Date(s).toISOString().slice(0,10)
-export default function Expenses(){const[xs,setXs]=useState<E[]>([]),[q,setQ]=useState(""),[open,setOpen]=useState(false),[edit,setEdit]=useState<E|null>(null),[loading,setLoading]=useState(true),[toast,setToast]=useState<ToastState>(null),[busy,setBusy]=useState(false)
-function say(message:string,type:"success"|"error"="success"){setToast({message,type});setTimeout(()=>setToast(null),2600)}async function load(){setLoading(true);const r=await fetch('/api/expenses');if(r.ok)setXs(await r.json());setLoading(false)}useEffect(()=>{load();if(new URLSearchParams(window.location.search).get('new')==='1')setOpen(true)},[])
-async function save(e:React.FormEvent<HTMLFormElement>){e.preventDefault();setBusy(true);const f=new FormData(e.currentTarget);const r=await fetch(edit?`/api/expenses/${edit.id}`:'/api/expenses',{method:edit?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.fromEntries(f))});setBusy(false);if(!r.ok){const d=await r.json().catch(()=>({}));return say(d.error||'Could not save expense','error')}e.currentTarget.reset();say(edit?'Expense updated':'Expense added');setEdit(null);setOpen(false);await load()}
-async function del(x:E){if(!confirm(`Delete ${x.merchant}?`))return;const r=await fetch(`/api/expenses/${x.id}`,{method:'DELETE'});if(r.ok){say('Expense deleted');load()}}
-const shown=useMemo(()=>xs.filter(x=>(x.merchant+' '+x.category).toLowerCase().includes(q.toLowerCase().trim())),[xs,q]);const total=xs.reduce((s,x)=>s+x.amount,0)
-return <AppShell><Toast toast={toast} onClose={()=>setToast(null)}/><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-3xl font-black">Expenses</h2><p className="muted mt-1">{xs.length} transactions · ₹{total.toLocaleString('en-IN')}</p></div><div className="flex flex-wrap gap-2"><Link href="/scan" className="btn btn-secondary md:hidden"><ScanLine size={17}/>Scan</Link><Link href="/recurring" className="btn btn-secondary"><Repeat2 size={17}/>Recurring</Link><Link href="/borrow-lend" className="btn btn-secondary"><HandCoins size={17}/>Borrow/Lend</Link><button onClick={()=>{setEdit(null);setOpen(v=>!v)}} className="btn btn-primary"><Plus size={17}/>{open&&!edit?'Close':'New expense'}</button></div></div>
-{(open||edit)&&<form key={edit?.id||'new'} onSubmit={save} className="glass card mt-6 grid gap-3 md:grid-cols-2"><input name="merchant" defaultValue={edit?.merchant} className="input" placeholder="Paid to / Merchant" required/><input name="amount" defaultValue={edit?.amount} className="input" type="number" min=".01" step=".01" placeholder="Amount" required/><select name="category" defaultValue={edit?.category||cats[0]} className="input">{cats.map(x=><option key={x}>{x}</option>)}</select><select name="paymentMethod" defaultValue={edit?.paymentMethod||payments[0]} className="input">{payments.map(x=><option key={x}>{x}</option>)}</select><input name="date" defaultValue={edit?dateInput(edit.date):''} className="input" type="date" required/><input name="notes" defaultValue={edit?.notes||''} className="input" placeholder="Notes (optional)"/><div className="flex gap-2 md:col-span-2"><button disabled={busy} className="btn btn-primary flex-1">{busy?'Saving...':edit?'Update expense':'Save expense'}</button>{edit&&<button type="button" onClick={()=>setEdit(null)} className="btn btn-secondary">Cancel</button>}</div></form>}
-<div className="glass card mt-6"><div className="relative"><Search size={18} className="pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 muted"/><input value={q} onChange={e=>setQ(e.target.value)} className="input !pl-12" placeholder="Search merchant or category..."/></div>{loading?<div className="mt-5 space-y-3">{[1,2,3,4].map(x=><div key={x} className="skeleton h-14"/>)}</div>:shown.length?<div className="mt-4 overflow-x-auto"><table className="w-full min-w-[700px] text-sm"><thead className="muted"><tr><th className="py-3 text-left">Merchant</th><th>Category</th><th>Payment</th><th>Date</th><th className="text-right">Amount</th><th/></tr></thead><tbody>{shown.map(x=><tr key={x.id} className="border-t border-white/8"><td className="py-4 font-bold">{x.merchant}</td><td className="text-center">{x.category}</td><td className="text-center muted">{x.paymentMethod}</td><td className="text-center muted">{new Date(x.date).toLocaleDateString('en-IN')}</td><td className="text-right font-bold">₹{x.amount.toLocaleString('en-IN')}</td><td><div className="flex justify-end gap-2"><button onClick={()=>{setEdit(x);setOpen(false);scrollTo({top:0,behavior:'smooth'})}} className="accent"><Pencil size={16}/></button><button onClick={()=>del(x)} className="text-rose-400"><Trash2 size={16}/></button></div></td></tr>)}</tbody></table></div>:<div className="empty-state mt-5"><ReceiptText className="mx-auto accent"/><p className="mt-3 font-black">No expenses yet</p><p className="mt-1 text-sm muted">Add your first expense to start tracking where your money goes.</p><button onClick={()=>setOpen(true)} className="btn btn-primary mt-4"><Plus size={16}/>Add first expense</button></div>}</div></AppShell>}
+
+import AppShell from "@/components/app-shell"
+import Toast, { ToastState } from "@/components/toast"
+import Link from "next/link"
+
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react"
+
+import {
+  Search,
+  Trash2,
+  Plus,
+  Repeat2,
+  ScanLine,
+  HandCoins,
+  Pencil,
+  ReceiptText,
+} from "lucide-react"
+
+type Expense = {
+  id: string
+  amount: number
+  merchant: string
+  category: string
+  paymentMethod: string
+  date: string
+  notes?: string
+}
+
+const categories = [
+  "Food",
+  "Transport",
+  "Shopping",
+  "Bills",
+  "Health",
+  "Entertainment",
+  "Education",
+  "Other",
+]
+
+const paymentMethods = [
+  "UPI",
+  "Card",
+  "Cash",
+  "Bank Transfer",
+]
+
+function dateInput(value: string) {
+  return new Date(value)
+    .toISOString()
+    .slice(0, 10)
+}
+
+export default function Expenses() {
+  const [expenses, setExpenses] =
+    useState<Expense[]>([])
+
+  const [query, setQuery] =
+    useState("")
+
+  const [open, setOpen] =
+    useState(false)
+
+  const [editing, setEditing] =
+    useState<Expense | null>(null)
+
+  const [loading, setLoading] =
+    useState(true)
+
+  const [toast, setToast] =
+    useState<ToastState>(null)
+
+  const [busy, setBusy] =
+    useState(false)
+
+  function say(
+    message: string,
+    type: "success" | "error" = "success"
+  ) {
+    setToast({
+      message,
+      type,
+    })
+
+    setTimeout(() => {
+      setToast(null)
+    }, 2600)
+  }
+
+  async function load() {
+    try {
+      setLoading(true)
+
+      const response =
+        await fetch("/api/expenses", {
+          cache: "no-store",
+        })
+
+      if (!response.ok) {
+        throw new Error(
+          "Failed to load expenses"
+        )
+      }
+
+      const data =
+        await response.json()
+
+      setExpenses(data)
+    } catch (error) {
+      console.error(
+        "Load expenses error:",
+        error
+      )
+
+      say(
+        "Could not load expenses",
+        "error"
+      )
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    load()
+
+    const params =
+      new URLSearchParams(
+        window.location.search
+      )
+
+    if (params.get("new") === "1") {
+      setOpen(true)
+    }
+  }, [])
+
+  async function save(
+    e: React.FormEvent<HTMLFormElement>
+  ) {
+    e.preventDefault()
+
+    // IMPORTANT:
+    // Save form reference before await.
+    const form = e.currentTarget
+
+    setBusy(true)
+
+    try {
+      const formData =
+        new FormData(form)
+
+      const payload =
+        Object.fromEntries(formData)
+
+      const response = await fetch(
+        editing
+          ? `/api/expenses/${editing.id}`
+          : "/api/expenses",
+        {
+          method: editing
+            ? "PUT"
+            : "POST",
+
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+
+          body: JSON.stringify(
+            payload
+          ),
+        }
+      )
+
+      const data = await response
+        .json()
+        .catch(() => ({}))
+
+      if (!response.ok) {
+        say(
+          data.error ||
+            "Could not save expense",
+          "error"
+        )
+
+        return
+      }
+
+      // Reset safely using saved form reference
+      form.reset()
+
+      setEditing(null)
+      setOpen(false)
+
+      say(
+        editing
+          ? "Expense updated"
+          : "Expense added"
+      )
+
+      // Reload list immediately
+      await load()
+    } catch (error) {
+      console.error(
+        "Save expense error:",
+        error
+      )
+
+      say(
+        "Could not save expense",
+        "error"
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function deleteExpense(
+    expense: Expense
+  ) {
+    const confirmed =
+      window.confirm(
+        `Delete ${expense.merchant}?`
+      )
+
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      const response =
+        await fetch(
+          `/api/expenses/${expense.id}`,
+          {
+            method: "DELETE",
+          }
+        )
+
+      const data = await response
+        .json()
+        .catch(() => ({}))
+
+      if (!response.ok) {
+        say(
+          data.error ||
+            "Could not delete expense",
+          "error"
+        )
+
+        return
+      }
+
+      say("Expense deleted")
+
+      // Remove immediately from UI
+      setExpenses((current) =>
+        current.filter(
+          (item) =>
+            item.id !== expense.id
+        )
+      )
+    } catch (error) {
+      console.error(
+        "Delete expense error:",
+        error
+      )
+
+      say(
+        "Could not delete expense",
+        "error"
+      )
+    }
+  }
+
+  function startEditing(
+    expense: Expense
+  ) {
+    setEditing(expense)
+    setOpen(false)
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    })
+  }
+
+  function cancelEditing() {
+    setEditing(null)
+  }
+
+  function toggleNewExpense() {
+    setEditing(null)
+
+    setOpen((current) => !current)
+  }
+
+  const shown = useMemo(() => {
+    const search =
+      query
+        .toLowerCase()
+        .trim()
+
+    return expenses.filter(
+      (expense) =>
+        `${expense.merchant} ${expense.category}`
+          .toLowerCase()
+          .includes(search)
+    )
+  }, [expenses, query])
+
+  const total = expenses.reduce(
+    (sum, expense) =>
+      sum + expense.amount,
+    0
+  )
+
+  return (
+    <AppShell>
+      <Toast
+        toast={toast}
+        onClose={() =>
+          setToast(null)
+        }
+      />
+
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-3xl font-black">
+            Expenses
+          </h2>
+
+          <p className="mt-1 muted">
+            {expenses.length} transactions
+            {" · "}₹
+            {total.toLocaleString(
+              "en-IN"
+            )}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/scan"
+            className="btn btn-secondary md:hidden"
+          >
+            <ScanLine size={17} />
+            Scan
+          </Link>
+
+          <Link
+            href="/recurring"
+            className="btn btn-secondary"
+          >
+            <Repeat2 size={17} />
+            Recurring
+          </Link>
+
+          <Link
+            href="/borrow-lend"
+            className="btn btn-secondary"
+          >
+            <HandCoins size={17} />
+            Borrow/Lend
+          </Link>
+
+          <button
+            type="button"
+            onClick={toggleNewExpense}
+            className="btn btn-primary"
+          >
+            <Plus size={17} />
+
+            {open && !editing
+              ? "Close"
+              : "New expense"}
+          </button>
+        </div>
+      </div>
+
+      {/* Add / Edit Form */}
+      {(open || editing) && (
+        <form
+          key={
+            editing?.id || "new"
+          }
+          onSubmit={save}
+          className="glass card mt-6 grid gap-3 md:grid-cols-2"
+        >
+          <input
+            name="merchant"
+            defaultValue={
+              editing?.merchant
+            }
+            className="input"
+            placeholder="Paid to / Merchant"
+            required
+          />
+
+          <input
+            name="amount"
+            defaultValue={
+              editing?.amount
+            }
+            className="input"
+            type="number"
+            min=".01"
+            step=".01"
+            placeholder="Amount"
+            required
+          />
+
+          <select
+            name="category"
+            defaultValue={
+              editing?.category ||
+              categories[0]
+            }
+            className="input"
+          >
+            {categories.map(
+              (category) => (
+                <option
+                  key={category}
+                  value={category}
+                >
+                  {category}
+                </option>
+              )
+            )}
+          </select>
+
+          <select
+            name="paymentMethod"
+            defaultValue={
+              editing?.paymentMethod ||
+              paymentMethods[0]
+            }
+            className="input"
+          >
+            {paymentMethods.map(
+              (method) => (
+                <option
+                  key={method}
+                  value={method}
+                >
+                  {method}
+                </option>
+              )
+            )}
+          </select>
+
+          <input
+            name="date"
+            defaultValue={
+              editing
+                ? dateInput(
+                    editing.date
+                  )
+                : ""
+            }
+            className="input"
+            type="date"
+            required
+          />
+
+          <input
+            name="notes"
+            defaultValue={
+              editing?.notes || ""
+            }
+            className="input"
+            placeholder="Notes (optional)"
+          />
+
+          <div className="flex gap-2 md:col-span-2">
+            <button
+              type="submit"
+              disabled={busy}
+              className="btn btn-primary flex-1"
+            >
+              {busy
+                ? "Saving..."
+                : editing
+                  ? "Update expense"
+                  : "Save expense"}
+            </button>
+
+            {editing && (
+              <button
+                type="button"
+                onClick={
+                  cancelEditing
+                }
+                disabled={busy}
+                className="btn btn-secondary"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
+        </form>
+      )}
+
+      {/* Expenses Panel */}
+      <div className="glass card mt-6">
+        {/* Search */}
+        <div className="relative">
+          <Search
+            size={18}
+            className="pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 muted"
+          />
+
+          <input
+            value={query}
+            onChange={(e) =>
+              setQuery(
+                e.target.value
+              )
+            }
+            className="input !pl-12"
+            placeholder="Search merchant or category..."
+          />
+        </div>
+
+        {/* Loading skeleton */}
+        {loading ? (
+          <div className="mt-5 space-y-3">
+            {[1, 2, 3, 4].map(
+              (item) => (
+                <div
+                  key={item}
+                  className="skeleton h-14 rounded-xl"
+                />
+              )
+            )}
+          </div>
+        ) : shown.length ? (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full min-w-[700px] text-sm">
+              <thead className="muted">
+                <tr>
+                  <th className="py-3 text-left">
+                    Merchant
+                  </th>
+
+                  <th>
+                    Category
+                  </th>
+
+                  <th>
+                    Payment
+                  </th>
+
+                  <th>
+                    Date
+                  </th>
+
+                  <th className="text-right">
+                    Amount
+                  </th>
+
+                  <th />
+                </tr>
+              </thead>
+
+              <tbody>
+                {shown.map(
+                  (expense) => (
+                    <tr
+                      key={
+                        expense.id
+                      }
+                      className="border-t border-white/8"
+                    >
+                      <td className="py-4 font-bold">
+                        {
+                          expense.merchant
+                        }
+                      </td>
+
+                      <td className="text-center">
+                        {
+                          expense.category
+                        }
+                      </td>
+
+                      <td className="text-center muted">
+                        {
+                          expense.paymentMethod
+                        }
+                      </td>
+
+                      <td className="text-center muted">
+                        {new Date(
+                          expense.date
+                        ).toLocaleDateString(
+                          "en-IN"
+                        )}
+                      </td>
+
+                      <td className="text-right font-bold">
+                        ₹
+                        {expense.amount.toLocaleString(
+                          "en-IN"
+                        )}
+                      </td>
+
+                      <td>
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              startEditing(
+                                expense
+                              )
+                            }
+                            className="accent"
+                            aria-label={`Edit ${expense.merchant}`}
+                          >
+                            <Pencil
+                              size={16}
+                            />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              deleteExpense(
+                                expense
+                              )
+                            }
+                            className="text-rose-400 transition hover:text-rose-300"
+                            aria-label={`Delete ${expense.merchant}`}
+                          >
+                            <Trash2
+                              size={16}
+                            />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="empty-state mt-5">
+            <ReceiptText className="mx-auto accent" />
+
+            <p className="mt-3 font-black">
+              No expenses yet
+            </p>
+
+            <p className="mt-1 text-sm muted">
+              Add your first expense to
+              start tracking where your
+              money goes.
+            </p>
+
+            <button
+              type="button"
+              onClick={() => {
+                setEditing(null)
+                setOpen(true)
+              }}
+              className="btn btn-primary mt-4"
+            >
+              <Plus size={16} />
+              Add first expense
+            </button>
+          </div>
+        )}
+      </div>
+    </AppShell>
+  )
+}

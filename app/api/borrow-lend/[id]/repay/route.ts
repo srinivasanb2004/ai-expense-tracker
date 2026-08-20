@@ -1,7 +1,7 @@
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { syncAllNotifications } from "@/lib/notifications"
-import { NextResponse } from "next/server"
+import { after, NextResponse } from "next/server"
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -86,7 +86,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       })
     }
 
-    await syncAllNotifications(userId)
+    after(() => syncAllNotifications(userId).catch((error) => console.error("Repayment notification sync error:", error)))
     return NextResponse.json({ success: true, settled })
   } catch (error) {
     console.error("Borrow/lend repayment error:", error)

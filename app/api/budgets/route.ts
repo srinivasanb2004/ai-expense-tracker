@@ -1,6 +1,6 @@
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
-import { NextResponse } from "next/server"
+import { after, NextResponse } from "next/server"
 import { syncBudgetNotifications } from "@/lib/notifications"
 
 async function getUserId() {
@@ -58,7 +58,7 @@ export async function POST(req: Request) {
       create: { userId, category: String(body.category), amount, month, year },
     })
 
-    await syncBudgetNotifications(userId)
+    after(() => syncBudgetNotifications(userId).catch((error) => console.error("Budget notification sync error:", error)))
     return NextResponse.json({ ...budget, amount: Number(budget.amount) })
   } catch (error) {
     console.error("Budget save error:", error)

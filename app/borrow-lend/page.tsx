@@ -1,8 +1,10 @@
 "use client"
 
 import AppShell from "@/components/app-shell"
+import Link from "next/link"
 import {
   AlertTriangle,
+  ArrowLeft,
   ArrowDownLeft,
   ArrowUpRight,
   CalendarClock,
@@ -269,6 +271,14 @@ export default function BorrowLendPage() {
   return (
     <AppShell>
       <Toast toast={toast} onClose={()=>setToast(null)} />
+
+      <div className="mb-4">
+        <Link href="/expenses" className="btn btn-secondary">
+          <ArrowLeft size={16} />
+          Back to Expenses
+        </Link>
+      </div>
+
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="eyebrow">Personal money</p>
