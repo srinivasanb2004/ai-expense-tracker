@@ -22,6 +22,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   if (!existing) return NextResponse.json({ error: "Record not found." }, { status: 404 })
   const repaid = existing.repayments.reduce((s,r)=>s+Number(r.amount),0)
   if (!b.person || !["BORROWED","LENT"].includes(String(b.type)) || !Number.isFinite(amount) || amount <= 0 || amount < repaid) return NextResponse.json({ error: "Enter valid details. Amount cannot be below already repaid value." }, { status: 400 })
-  const x = await prisma.borrowLend.update({ where: { id }, data: { person:String(b.person).trim(), phone:b.phone?String(b.phone).trim():null, type:String(b.type), amount, startDate:new Date(b.startDate), dueDate:b.dueDate?new Date(b.dueDate):null, notes:b.notes?String(b.notes):null } })
-  return NextResponse.json({ ...x, amount:Number(x.amount) })
+  const startDate=new Date(b.startDate); const dueDate=b.dueDate?new Date(b.dueDate):null
+  if(dueDate && dueDate<startDate)return NextResponse.json({error:"Due date cannot be before the start date."},{status:400})
+  const x = await prisma.borrowLend.update({ where: { id }, data: { person:String(b.person).trim(), phone:b.phone?String(b.phone).trim():null, type:String(b.type), amount, startDate, dueDate, notes:b.notes?String(b.notes):null }, include:{repayments:{orderBy:{date:"desc"}}} })
+  const paid=x.repayments.reduce((sum,r)=>sum+Number(r.amount),0)
+  return NextResponse.json({ ...x, amount:Number(x.amount), repaid:paid, remaining:Math.max(Number(x.amount)-paid,0), repayments:x.repayments.map(r=>({...r,amount:Number(r.amount)})) })
 }

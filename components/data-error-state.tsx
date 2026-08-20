@@ -1,0 +1,3 @@
+"use client"
+import { RefreshCw, WifiOff } from "lucide-react"
+export default function DataErrorState({title="Unable to load data",message="We couldn't connect to your financial data. Check your internet connection and try again.",onRetry}:{title?:string;message?:string;onRetry:()=>void}){return <div className="soft-panel mt-6 text-center"><div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-red-500/10 text-red-400"><WifiOff size={30}/></div><p className="eyebrow mt-5">Connection problem</p><h3 className="mt-2 text-2xl font-black">{title}</h3><p className="mx-auto mt-3 max-w-md text-sm leading-6 muted">{message}</p><button type="button" onClick={onRetry} className="btn btn-primary mt-5"><RefreshCw size={17}/>Try Again</button></div>}

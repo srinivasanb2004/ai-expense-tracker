@@ -44,6 +44,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Please complete person, type, amount and date." }, { status: 400 })
     }
 
+    const startDate = new Date(body.startDate)
+    const dueDate = body.dueDate ? new Date(body.dueDate) : null
+    if (dueDate && dueDate < startDate) return NextResponse.json({ error: "Due date cannot be before the start date." }, { status: 400 })
+
     const record = await prisma.borrowLend.create({
       data: {
         userId: id,
@@ -51,8 +55,8 @@ export async function POST(req: Request) {
         phone: body.phone ? String(body.phone).trim() : null,
         type,
         amount,
-        startDate: new Date(body.startDate),
-        dueDate: body.dueDate ? new Date(body.dueDate) : null,
+        startDate,
+        dueDate,
         notes: body.notes ? String(body.notes) : null,
       },
       include: { repayments: true },

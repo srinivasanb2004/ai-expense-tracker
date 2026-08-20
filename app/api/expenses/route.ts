@@ -24,9 +24,9 @@ export async function POST(req: Request) {
     const body = await req.json()
     const amount = Number(body.amount)
 
-    if (!body.merchant || !body.category || !body.paymentMethod || !body.date || !Number.isFinite(amount) || amount <= 0) {
-      return NextResponse.json({ error: "Please complete all required expense fields." }, { status: 400 })
-    }
+    if (!body.merchant || !body.category || !body.paymentMethod || !body.date || !Number.isFinite(amount) || amount <= 0) return NextResponse.json({ error: "Please complete all required expense fields." }, { status: 400 })
+    const date = new Date(body.date)
+    if (Number.isNaN(date.getTime()) || date.getTime() > Date.now() + 86_400_000) return NextResponse.json({ error: "Expense date cannot be in the future." }, { status: 400 })
 
     const expense = await prisma.expense.create({
       data: {
@@ -35,7 +35,7 @@ export async function POST(req: Request) {
         merchant: String(body.merchant),
         category: String(body.category),
         paymentMethod: String(body.paymentMethod),
-        date: new Date(body.date),
+        date,
         notes: body.notes ? String(body.notes) : null,
       },
     })

@@ -1,6 +1,7 @@
 "use client"
 
 import AppShell from "@/components/app-shell"
+import DataErrorState from "@/components/data-error-state"
 import Link from "next/link"
 import { CheckCircle2, FileText, ScanLine, UploadCloud } from "lucide-react"
 import { useState } from "react"
@@ -24,10 +25,14 @@ export default function Scan() {
   const [status, setStatus] = useState("")
   const [scanning, setScanning] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [connectionError, setConnectionError] = useState(false)
+  const [validationError, setValidationError] = useState("")
 
   async function scan() {
     if (!file || scanning) return
     setScanning(true)
+    setConnectionError(false)
+    setValidationError("")
     setStatus("Gemini is reading your receipt...")
     setData(null)
 
@@ -37,10 +42,13 @@ export default function Scan() {
       const response = await fetch("/api/ocr", { method: "POST", body: formData })
       const text = await response.text()
       const payload = text ? JSON.parse(text) : {}
-      if (!response.ok) throw new Error(payload.error || "Receipt scan failed.")
+      if (!response.ok) { if(response.status >= 500) setConnectionError(true); throw new Error(payload.error || "Receipt scan failed.") }
+      const invalid=!payload.merchant || !Number.isFinite(Number(payload.amount)) || Number(payload.amount)<=0
       setData(payload)
-      setStatus("Receipt extracted. Review the fields before saving.")
+      setValidationError(invalid ? "Gemini could not confidently read the merchant or total. Please correct the highlighted fields before saving." : "")
+      setStatus(invalid ? "Receipt extracted with missing/invalid data." : "Receipt extracted. Review the fields before saving.")
     } catch (error) {
+      if(!navigator.onLine || error instanceof TypeError) setConnectionError(true)
       setStatus(error instanceof Error ? error.message : "Receipt scan failed.")
     } finally {
       setScanning(false)
@@ -49,6 +57,10 @@ export default function Scan() {
 
   async function save() {
     if (!data || saving) return
+    if(!data.merchant.trim()){setValidationError("Merchant name is required before saving.");return}
+    if(!Number.isFinite(data.amount)||data.amount<=0){setValidationError("Enter a valid receipt total before saving.");return}
+    if(data.date && data.date > new Date().toISOString().slice(0,10)){setValidationError("Receipt date cannot be in the future.");return}
+    setValidationError("")
     setSaving(true)
     setStatus("Saving expense...")
 
@@ -64,11 +76,12 @@ export default function Scan() {
         }),
       })
       const payload = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(payload.error || "Could not save expense.")
+      if (!response.ok) { if(response.status >= 500) setConnectionError(true); throw new Error(payload.error || "Could not save expense.") }
       setStatus("Expense saved successfully.")
       setData(null)
       setFile(null)
     } catch (error) {
+      if(!navigator.onLine || error instanceof TypeError) setConnectionError(true)
       setStatus(error instanceof Error ? error.message : "Could not save expense.")
     } finally {
       setSaving(false)
@@ -83,6 +96,8 @@ export default function Scan() {
       >
         ← Back to Expenses
       </Link>
+
+      {connectionError && <DataErrorState title="Receipt service unavailable" message="Check your internet connection and try again." onRetry={()=>setConnectionError(false)} />}
 
       <div>
         <p className="eyebrow">Gemini Vision</p>
@@ -123,6 +138,7 @@ export default function Scan() {
             {scanning ? "Scanning with Gemini..." : "Extract receipt with Gemini"}
           </button>
           {status && <p className="mt-3 text-sm muted">{status}</p>}
+          {validationError && <p className="mt-3 rounded-xl border border-amber-400/20 bg-amber-400/10 p-3 text-sm text-amber-300">{validationError}</p>}
         </div>
 
         <div className="soft-panel">
@@ -156,7 +172,7 @@ export default function Scan() {
               </label>
               <label>
                 <span className="text-xs font-bold uppercase tracking-wider muted">Date</span>
-                <input className="input mt-1" type="date" value={data.date || ""} onChange={(e) => setData({ ...data, date: e.target.value || null })} />
+                <input className="input mt-1" type="date" max={new Date().toISOString().slice(0,10)} value={data.date || ""} onChange={(e) => setData({ ...data, date: e.target.value || null })} />
               </label>
               <label>
                 <span className="text-xs font-bold uppercase tracking-wider muted">Category</span>

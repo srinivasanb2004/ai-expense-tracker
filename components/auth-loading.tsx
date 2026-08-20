@@ -1,0 +1,2 @@
+import Logo from "@/components/logo"
+export default function AuthLoading({label="Loading..."}:{label?:string}){return <main className="grid min-h-screen place-items-center p-4"><div className="glass w-full max-w-md rounded-3xl p-7"><Logo/><div className="mt-8 skeleton h-9 w-2/3"/><div className="mt-3 skeleton h-4 w-1/2"/><div className="mt-7 space-y-4"><div className="skeleton h-12"/><div className="skeleton h-12"/><div className="skeleton h-12"/></div><p className="mt-5 text-center text-sm muted">{label}</p></div></main>}

@@ -23,16 +23,16 @@ export async function POST(req: Request) {
   try {
     const body = await req.json()
     const amount = Number(body.amount)
-    if (!body.source || !body.date || !Number.isFinite(amount) || amount <= 0) {
-      return NextResponse.json({ error: "Source, date and a valid amount are required." }, { status: 400 })
-    }
+    if (!body.source || !body.date || !Number.isFinite(amount) || amount <= 0) return NextResponse.json({ error: "Source, date and a valid amount are required." }, { status: 400 })
+    const date = new Date(body.date)
+    if (Number.isNaN(date.getTime()) || date.getTime() > Date.now() + 86_400_000) return NextResponse.json({ error: "Income date cannot be in the future." }, { status: 400 })
 
     const income = await prisma.income.create({
       data: {
         userId,
         source: String(body.source),
         amount,
-        date: new Date(body.date),
+        date,
         category: String(body.category || "Salary"),
         notes: body.notes ? String(body.notes) : null,
       },

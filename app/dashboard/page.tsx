@@ -57,9 +57,10 @@ export default async function Dashboard() {
   let incomes: any[] = []
   let budgets: any[] = []
   let recent: any[] = []
+  let borrowLend: any[] = []
 
   try {
-    ;[expenses, incomes, budgets, recent] =
+    ;[expenses, incomes, budgets, recent, borrowLend] =
       await Promise.all([
         prisma.expense.findMany({
           where: {
@@ -97,6 +98,11 @@ export default async function Dashboard() {
             date: "desc",
           },
           take: 6,
+        }),
+
+        prisma.borrowLend.findMany({
+          where: { userId, status: { not: "SETTLED" } },
+          include: { repayments: true },
         }),
       ])
   } catch (error) {
@@ -168,6 +174,16 @@ export default async function Dashboard() {
     budget > 0
       ? Math.min((spent / budget) * 100, 100)
       : 0
+
+
+  const youOwe = borrowLend.filter((x) => x.type === "BORROWED").reduce((sum, x) => {
+    const paid=x.repayments.reduce((s:number,r:any)=>s+Number(r.amount),0)
+    return sum + Math.max(Number(x.amount)-paid,0)
+  },0)
+  const owedToYou = borrowLend.filter((x) => x.type === "LENT").reduce((sum, x) => {
+    const paid=x.repayments.reduce((s:number,r:any)=>s+Number(r.amount),0)
+    return sum + Math.max(Number(x.amount)-paid,0)
+  },0)
 
   const cats: Record<string, number> = {}
 
@@ -340,6 +356,11 @@ export default async function Dashboard() {
             </div>
           )
         )}
+      </section>
+
+      <section className="mt-5 grid gap-4 sm:grid-cols-2">
+        <a href="/borrow-lend" className="stat-card block transition hover:-translate-y-0.5"><div className="flex items-center justify-between"><span className="metric-label">You owe</span><ArrowUpRight size={18} className="text-rose-400"/></div><p className="mt-4 text-2xl font-black">{money(youOwe)}</p><p className="mt-1 text-xs muted">Outstanding borrowed money</p></a>
+        <a href="/borrow-lend" className="stat-card block transition hover:-translate-y-0.5"><div className="flex items-center justify-between"><span className="metric-label">Owed to you</span><ArrowDownRight size={18} className="accent"/></div><p className="mt-4 text-2xl font-black">{money(owedToYou)}</p><p className="mt-1 text-xs muted">Outstanding money you lent</p></a>
       </section>
 
       {/* ACTIVITY + BUDGET */}

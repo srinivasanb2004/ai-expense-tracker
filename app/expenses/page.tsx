@@ -2,6 +2,8 @@
 
 import AppShell from "@/components/app-shell"
 import Toast, { ToastState } from "@/components/toast"
+import DataErrorState from "@/components/data-error-state"
+import ConfirmModal from "@/components/confirm-modal"
 import Link from "next/link"
 
 import {
@@ -77,6 +79,9 @@ export default function Expenses() {
   const [busy, setBusy] =
     useState(false)
 
+  const [loadError, setLoadError] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<Expense | null>(null)
+
   function say(
     message: string,
     type: "success" | "error" = "success"
@@ -94,6 +99,7 @@ export default function Expenses() {
   async function load() {
     try {
       setLoading(true)
+      setLoadError(false)
 
       const response =
         await fetch("/api/expenses", {
@@ -116,10 +122,7 @@ export default function Expenses() {
         error
       )
 
-      say(
-        "Could not load expenses",
-        "error"
-      )
+      setLoadError(true)
     } finally {
       setLoading(false)
     }
@@ -138,141 +141,29 @@ export default function Expenses() {
     }
   }, [])
 
-  async function save(
-    e: React.FormEvent<HTMLFormElement>
-  ) {
-    e.preventDefault()
-
-    // IMPORTANT:
-    // Save form reference before await.
-    const form = e.currentTarget
-
-    setBusy(true)
-
-    try {
-      const formData =
-        new FormData(form)
-
-      const payload =
-        Object.fromEntries(formData)
-
-      const response = await fetch(
-        editing
-          ? `/api/expenses/${editing.id}`
-          : "/api/expenses",
-        {
-          method: editing
-            ? "PUT"
-            : "POST",
-
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
-
-          body: JSON.stringify(
-            payload
-          ),
-        }
-      )
-
-      const data = await response
-        .json()
-        .catch(() => ({}))
-
-      if (!response.ok) {
-        say(
-          data.error ||
-            "Could not save expense",
-          "error"
-        )
-
-        return
-      }
-
-      // Reset safely using saved form reference
-      form.reset()
-
-      setEditing(null)
-      setOpen(false)
-
-      say(
-        editing
-          ? "Expense updated"
-          : "Expense added"
-      )
-
-      // Reload list immediately
-      await load()
-    } catch (error) {
-      console.error(
-        "Save expense error:",
-        error
-      )
-
-      say(
-        "Could not save expense",
-        "error"
-      )
-    } finally {
-      setBusy(false)
-    }
+  async function save(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault(); const form=e.currentTarget; const payload=Object.fromEntries(new FormData(form)) as Record<string,string>
+    const amount=Number(payload.amount); const date=payload.date
+    if(!payload.merchant||!payload.category||!payload.paymentMethod||!date||!Number.isFinite(amount)||amount<=0)return say("Complete all required expense fields.","error")
+    if(date>new Date().toISOString().slice(0,10))return say("Expense date cannot be in the future.","error")
+    const previous=expenses; const originalEdit=editing; const tempId=originalEdit?.id||`temp-${Date.now()}`
+    const optimistic:Expense={id:tempId,merchant:payload.merchant,amount,category:payload.category,paymentMethod:payload.paymentMethod,date:new Date(`${date}T00:00:00`).toISOString(),notes:payload.notes||undefined}
+    setExpenses(current=>originalEdit?current.map(x=>x.id===originalEdit.id?optimistic:x):[optimistic,...current]); form.reset(); setEditing(null); setOpen(false); setBusy(true)
+    try{const response=await fetch(originalEdit?`/api/expenses/${originalEdit.id}`:"/api/expenses",{method:originalEdit?"PUT":"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||"Could not save expense");setExpenses(current=>current.map(x=>x.id===tempId?data:x));say(originalEdit?"Expense updated":"Expense added")}catch(error){setExpenses(previous);if(originalEdit)setEditing(originalEdit);else setOpen(true);say(error instanceof Error?error.message:"Could not save expense","error")}finally{setBusy(false)}
   }
 
-  async function deleteExpense(
-    expense: Expense
-  ) {
-    const confirmed =
-      window.confirm(
-        `Delete ${expense.merchant}?`
-      )
-
-    if (!confirmed) {
-      return
-    }
-
+  async function deleteExpense(expense: Expense) {
+    const previous = expenses
+    setDeleteTarget(null)
+    setExpenses((current) => current.filter((item) => item.id !== expense.id))
     try {
-      const response =
-        await fetch(
-          `/api/expenses/${expense.id}`,
-          {
-            method: "DELETE",
-          }
-        )
-
-      const data = await response
-        .json()
-        .catch(() => ({}))
-
-      if (!response.ok) {
-        say(
-          data.error ||
-            "Could not delete expense",
-          "error"
-        )
-
-        return
-      }
-
+      const response = await fetch(`/api/expenses/${expense.id}`, { method: "DELETE" })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.error || "Could not delete expense")
       say("Expense deleted")
-
-      // Remove immediately from UI
-      setExpenses((current) =>
-        current.filter(
-          (item) =>
-            item.id !== expense.id
-        )
-      )
     } catch (error) {
-      console.error(
-        "Delete expense error:",
-        error
-      )
-
-      say(
-        "Could not delete expense",
-        "error"
-      )
+      setExpenses(previous)
+      say(error instanceof Error ? error.message : "Could not delete expense", "error")
     }
   }
 
@@ -506,6 +397,8 @@ export default function Expenses() {
         </form>
       )}
 
+      {loadError && <DataErrorState title="Unable to load expenses" onRetry={load} />}
+
       {/* Expenses Panel */}
       <div className="glass card mt-6">
         {/* Search */}
@@ -528,7 +421,7 @@ export default function Expenses() {
         </div>
 
         {/* Loading skeleton */}
-        {loading ? (
+        {loadError ? null : loading ? (
           <div className="mt-5 space-y-3">
             {[1, 2, 3, 4].map(
               (item) => (
@@ -629,11 +522,7 @@ export default function Expenses() {
 
                           <button
                             type="button"
-                            onClick={() =>
-                              deleteExpense(
-                                expense
-                              )
-                            }
+                            onClick={() => setDeleteTarget(expense)}
                             className="text-rose-400 transition hover:text-rose-300"
                             aria-label={`Delete ${expense.merchant}`}
                           >
@@ -677,6 +566,7 @@ export default function Expenses() {
           </div>
         )}
       </div>
+      <ConfirmModal open={!!deleteTarget} title="Delete expense?" message={deleteTarget ? `Delete ${deleteTarget.merchant}? This action cannot be undone.` : ""} confirmLabel="Delete expense" busy={busy} onCancel={() => setDeleteTarget(null)} onConfirm={() => deleteTarget && deleteExpense(deleteTarget)} />
     </AppShell>
   )
 }

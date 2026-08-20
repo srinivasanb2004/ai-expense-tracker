@@ -1,6 +1,7 @@
 "use client"
 
 import AppShell from "@/components/app-shell"
+import DataErrorState from "@/components/data-error-state"
 import { Bot, Send, Sparkles } from "lucide-react"
 import { useState } from "react"
 
@@ -13,6 +14,7 @@ export default function Assistant() {
   ])
   const [question, setQuestion] = useState("")
   const [busy, setBusy] = useState(false)
+  const [connectionError, setConnectionError] = useState(false)
 
   async function ask(text = question) {
     const q = text.trim()
@@ -20,6 +22,7 @@ export default function Assistant() {
     setMessages((items) => [...items, { role: "user", text: q }])
     setQuestion("")
     setBusy(true)
+    setConnectionError(false)
 
     try {
       const response = await fetch("/api/ai", {
@@ -30,9 +33,10 @@ export default function Assistant() {
       const raw = await response.text()
       if (!raw) throw new Error(`AI API returned an empty response (${response.status}).`)
       const data = JSON.parse(raw)
-      if (!response.ok) throw new Error(data.error || "Failed to get AI response.")
+      if (!response.ok) { if(response.status >= 500) setConnectionError(true); throw new Error(data.error || "Failed to get AI response.") }
       setMessages((items) => [...items, { role: "ai", text: data.answer || "I could not generate an answer." }])
     } catch (error) {
+      if(!navigator.onLine || (error instanceof TypeError)) setConnectionError(true)
       setMessages((items) => [...items, { role: "ai", text: error instanceof Error ? error.message : "Something went wrong." }])
     } finally {
       setBusy(false)
@@ -45,6 +49,8 @@ export default function Assistant() {
         <div className="grid h-12 w-12 place-items-center rounded-2xl bg-emerald-300 text-emerald-950"><Bot /></div>
         <div><p className="eyebrow">Gemini powered</p><h2 className="mt-1 text-3xl font-black">AI Assistant</h2><p className="muted">Ask questions about your money.</p></div>
       </div>
+
+      {connectionError && <DataErrorState title="AI Assistant is unavailable" message="Check your internet connection and try your question again." onRetry={()=>setConnectionError(false)} />}
 
       <div className="soft-panel mt-6">
         <div className="flex flex-wrap gap-2">

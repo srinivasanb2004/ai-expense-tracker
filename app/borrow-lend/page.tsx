@@ -20,6 +20,8 @@ import {
 } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import Toast, { ToastState } from "@/components/toast"
+import DataErrorState from "@/components/data-error-state"
+import ConfirmModal from "@/components/confirm-modal"
 
 type Repayment = {
   id: string
@@ -122,11 +124,17 @@ export default function BorrowLendPage() {
   const [expandedPerson, setExpandedPerson] = useState<string | null>(null)
   const [edit, setEdit] = useState<RecordItem | null>(null)
   const [toast, setToast] = useState<ToastState>(null)
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<RecordItem | null>(null)
+  const [settleTarget, setSettleTarget] = useState<RecordItem | null>(null)
+  const [settleExpense, setSettleExpense] = useState(true)
   function say(message:string,type:"success"|"error"="success"){setToast({message,type});setTimeout(()=>setToast(null),2500)}
 
   async function load() {
-    const response = await fetch("/api/borrow-lend", { cache: "no-store" })
-    if (response.ok) setItems(await response.json())
+    setLoading(true); setLoadError(false)
+    try { const response=await fetch("/api/borrow-lend",{cache:"no-store"}); if(!response.ok)throw new Error(); setItems(await response.json()) }
+    catch { setLoadError(true) } finally { setLoading(false) }
   }
 
   useEffect(() => {
@@ -134,96 +142,34 @@ export default function BorrowLendPage() {
   }, [])
 
   async function add(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    const form = e.currentTarget
-    setBusy(true)
-    setMessage("")
-
-    const response = await fetch("/api/borrow-lend", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(Object.fromEntries(new FormData(form))),
-    })
-    const data = await response.json().catch(() => ({}))
-    setBusy(false)
-
-    if (!response.ok) {
-      setMessage(data.error || "Could not save record.")
-      return
-    }
-
-    form.reset()
-    setOpen(false)
-    setMessage("Borrow/Lend record saved.")
-    await load()
+    e.preventDefault();const form=e.currentTarget;const raw=Object.fromEntries(new FormData(form)) as Record<string,string>;const amount=Number(raw.amount);if(raw.dueDate&&raw.startDate&&raw.dueDate<raw.startDate){setMessage("Due date cannot be before the start date.");return}if(!raw.person||!raw.startDate||!Number.isFinite(amount)||amount<=0){setMessage("Please complete person, type, amount and date.");return}
+    const previous=items;const tempId=`temp-${Date.now()}`;const optimistic:RecordItem={id:tempId,person:raw.person,phone:raw.phone||null,type:raw.type as "BORROWED"|"LENT",amount,repaid:0,remaining:amount,startDate:new Date(`${raw.startDate}T00:00:00`).toISOString(),dueDate:raw.dueDate?new Date(`${raw.dueDate}T00:00:00`).toISOString():null,notes:raw.notes||null,status:"PENDING",repayments:[]};setItems(current=>[optimistic,...current]);form.reset();setOpen(false);setBusy(true);setMessage("")
+    try{const response=await fetch("/api/borrow-lend",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(raw)});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||"Could not save record.");setItems(current=>current.map(x=>x.id===tempId?data:x));say("Borrow/Lend record saved.")}catch(error){setItems(previous);setOpen(true);setMessage(error instanceof Error?error.message:"Could not save record.")}finally{setBusy(false)}
   }
 
   async function saveEdit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault(); if(!edit)return; setBusy(true)
-    const response=await fetch(`/api/borrow-lend/${edit.id}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(Object.fromEntries(new FormData(e.currentTarget)))})
-    setBusy(false);const d=await response.json().catch(()=>({}));if(!response.ok)return say(d.error||"Could not update record","error")
-    setEdit(null);say("Borrow/Lend record updated");await load()
+    e.preventDefault();if(!edit)return;const raw=Object.fromEntries(new FormData(e.currentTarget)) as Record<string,string>;const amount=Number(raw.amount);if(raw.dueDate&&raw.startDate&&raw.dueDate<raw.startDate)return say("Due date cannot be before the start date.","error");if(amount<edit.repaid)return say("Amount cannot be below the amount already repaid.","error");const previous=items;const original=edit;const optimistic:RecordItem={...original,person:raw.person,phone:raw.phone||null,type:raw.type as "BORROWED"|"LENT",amount,remaining:Math.max(amount-original.repaid,0),startDate:new Date(`${raw.startDate}T00:00:00`).toISOString(),dueDate:raw.dueDate?new Date(`${raw.dueDate}T00:00:00`).toISOString():null,notes:raw.notes||null};setItems(current=>current.map(x=>x.id===original.id?optimistic:x));setEdit(null);setBusy(true)
+    try{const response=await fetch(`/api/borrow-lend/${original.id}`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(raw)});const d=await response.json().catch(()=>({}));if(!response.ok)throw new Error(d.error||"Could not update record");setItems(current=>current.map(x=>x.id===original.id?d:x));say("Borrow/Lend record updated")}catch(error){setItems(previous);setEdit(original);say(error instanceof Error?error.message:"Could not update record","error")}finally{setBusy(false)}
   }
 
-  async function settleFull(item: RecordItem) {
-    const confirmed = window.confirm(
-      item.type === "BORROWED"
-        ? `Mark the remaining ${money(item.remaining)} owed to ${item.person} as fully repaid?`
-        : `Mark the remaining ${money(item.remaining)} from ${item.person} as fully received?`
-    )
-    if (!confirmed) return
-
-    const createExpense =
-      item.type === "BORROWED"
-        ? window.confirm(
-            "Also add this repayment to Expenses? Choose OK to add it, or Cancel to settle without creating an expense."
-          )
-        : false
-
-    setBusy(true)
-    setMessage("")
-
-    const response = await fetch(`/api/borrow-lend/${item.id}/repay`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        amount: item.remaining,
-        date: new Date().toISOString().slice(0, 10),
-        createExpense,
-        paymentMethod: "UPI",
-        notes: "Full settlement",
-      }),
-    })
-    const data = await response.json().catch(() => ({}))
-    setBusy(false)
-
-    if (!response.ok) {
-      setMessage(data.error || "Could not settle record.")
-      return
-    }
-
-    setMessage(
-      item.type === "BORROWED"
-        ? "Borrowed amount fully repaid."
-        : "Lent amount fully received."
-    )
-    await load()
+  async function settleFull(item: RecordItem, createExpense = false) {
+    setBusy(true); setMessage("")
+    try{const response=await fetch(`/api/borrow-lend/${item.id}/repay`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({amount:item.remaining,date:new Date().toISOString().slice(0,10),createExpense:item.type==="BORROWED"&&createExpense,paymentMethod:"UPI",notes:"Full settlement"})});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||"Could not settle record.");setSettleTarget(null);setMessage(item.type==="BORROWED"?"Borrowed amount fully repaid.":"Lent amount fully received.");await load()}catch(error){setMessage(error instanceof Error?error.message:"Could not settle record.")}finally{setBusy(false)}
   }
 
-  async function remove(id: string) {
-    if (!window.confirm("Delete this Borrow & Lend record and its repayment history?")) return
-    const response = await fetch(`/api/borrow-lend/${id}`, { method: "DELETE" })
-    if (response.ok) { say("Borrow/Lend record deleted"); await load() }
+  async function remove(item: RecordItem) {
+    const previous=items; setDeleteTarget(null); setItems(current=>current.filter(x=>x.id!==item.id))
+    try{const response=await fetch(`/api/borrow-lend/${item.id}`,{method:"DELETE"});if(!response.ok)throw new Error("Could not delete record");say("Borrow/Lend record deleted")}catch(error){setItems(previous);say(error instanceof Error?error.message:"Could not delete record","error")}
   }
 
   async function repay(e: React.FormEvent<HTMLFormElement>, item: RecordItem) {
     e.preventDefault()
     const form = e.currentTarget
     const raw = Object.fromEntries(new FormData(form)) as Record<string, FormDataEntryValue>
-    const payload = {
-      ...raw,
-      createExpense: raw.createExpense === "on",
-    }
+    const payment=Number(raw.amount)
+    if(!Number.isFinite(payment)||payment<=0){setMessage("Enter a valid repayment amount.");return}
+    if(payment>item.remaining){setMessage(`Repayment cannot exceed the remaining ${money(item.remaining)}.`);return}
+    const payload = { ...raw, createExpense: raw.createExpense === "on" }
 
     setBusy(true)
     setMessage("")
@@ -323,7 +269,10 @@ export default function BorrowLendPage() {
 
       {message && <p className="mt-3 text-sm font-semibold accent">{message}</p>}
 
-      <section className="mt-6">
+      {loadError && <DataErrorState title="Unable to load Borrow & Lend" onRetry={load} />}
+      {!loadError && loading && <div className="mt-6 grid gap-4 lg:grid-cols-2"><div className="skeleton h-64"/><div className="skeleton h-64"/></div>}
+
+      {!loading && !loadError && <section className="mt-6">
         <div className="flex items-center gap-2">
           <HandCoins className="accent" size={19} />
           <h3 className="text-lg font-black">Active records</h3>
@@ -355,7 +304,7 @@ export default function BorrowLendPage() {
 
                   <div className="flex gap-1">
                     <button onClick={() => setEdit(item)} className="grid h-9 w-9 place-items-center rounded-xl accent hover:bg-emerald-500/10" aria-label="Edit record"><Pencil size={16}/></button>
-                    <button onClick={() => remove(item.id)} className="grid h-9 w-9 place-items-center rounded-xl text-rose-400 hover:bg-rose-500/10" aria-label="Delete record"><Trash2 size={16}/></button>
+                    <button onClick={() => setDeleteTarget(item)} className="grid h-9 w-9 place-items-center rounded-xl text-rose-400 hover:bg-rose-500/10" aria-label="Delete record"><Trash2 size={16}/></button>
                   </div>
                 </div>
 
@@ -379,7 +328,7 @@ export default function BorrowLendPage() {
                     {item.type === "BORROWED" ? "Add repayment" : "Add received amount"}
                   </button>
 
-                  <button onClick={() => settleFull(item)} disabled={busy} className="btn btn-secondary">
+                  <button onClick={() => {setSettleExpense(true);setSettleTarget(item)}} disabled={busy} className="btn btn-secondary">
                     <CheckCircle2 size={16} />
                     {item.type === "BORROWED" ? "Mark fully paid" : "Mark fully received"}
                   </button>
@@ -400,7 +349,7 @@ export default function BorrowLendPage() {
                       placeholder={`Up to ${money(item.remaining)}`}
                       required
                     />
-                    <input name="date" className="input" type="date" required />
+                    <input name="date" className="input" type="date" max={new Date().toISOString().slice(0,10)} required />
                     <input name="notes" className="input sm:col-span-2" placeholder="Repayment note (optional)" />
 
                     {item.type === "BORROWED" && (
@@ -454,9 +403,9 @@ export default function BorrowLendPage() {
             </div>
           )}
         </div>
-      </section>
+      </section>}
 
-      <section className="soft-panel mt-6">
+      {!loading && !loadError && <section className="soft-panel mt-6">
         <div className="flex items-center gap-2">
           <History size={18} className="accent" />
           <h3 className="font-black">Person-wise history</h3>
@@ -520,7 +469,10 @@ export default function BorrowLendPage() {
 
           {!people.length && <p className="py-6 text-center text-sm muted">No person history yet.</p>}
         </div>
-      </section>
+      </section>}
+
+      <ConfirmModal open={!!deleteTarget} title="Delete Borrow & Lend record?" message="This will permanently delete the record and its repayment history." confirmLabel="Delete record" onCancel={()=>setDeleteTarget(null)} onConfirm={()=>deleteTarget&&remove(deleteTarget)} />
+      {settleTarget && <div className="fixed inset-0 z-[120] grid place-items-center bg-black/70 p-4"><div className="modal-panel w-full max-w-md rounded-3xl border p-6"><h3 className="text-xl font-black">{settleTarget.type==="BORROWED"?"Mark fully paid?":"Mark fully received?"}</h3><p className="mt-3 text-sm muted">Settle the remaining {money(settleTarget.remaining)} {settleTarget.type==="BORROWED"?`owed to ${settleTarget.person}`:`from ${settleTarget.person}`}.</p>{settleTarget.type==="BORROWED"&&<label className="mt-5 flex items-center gap-3 rounded-xl border p-3 text-sm" style={{borderColor:"var(--line)"}}><input type="checkbox" checked={settleExpense} onChange={e=>setSettleExpense(e.target.checked)}/>Also add this repayment to Expenses</label>}<div className="mt-6 flex justify-end gap-3"><button type="button" className="btn btn-secondary" onClick={()=>setSettleTarget(null)} disabled={busy}>Cancel</button><button type="button" className="btn btn-primary" disabled={busy} onClick={()=>settleFull(settleTarget,settleExpense)}>{busy?"Saving...":"Confirm settlement"}</button></div></div></div>}
     </AppShell>
   )
 }

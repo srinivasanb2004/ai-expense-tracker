@@ -1,6 +1,7 @@
 "use client"
 
 import AppShell from "@/components/app-shell"
+import DataErrorState from "@/components/data-error-state"
 import { CalendarDays, IndianRupee, PiggyBank, ReceiptText, TrendingUp } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import {
@@ -40,6 +41,7 @@ export default function Analytics() {
   const [to, setTo] = useState("")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [reloadKey, setReloadKey] = useState(0)
 
   const query = useMemo(() => {
     const params = new URLSearchParams({ range })
@@ -68,7 +70,7 @@ export default function Analytics() {
     return () => {
       active = false
     }
-  }, [query, range, from, to])
+  }, [query, range, from, to, reloadKey])
 
   const cards = data
     ? [
@@ -115,7 +117,7 @@ export default function Analytics() {
         </div>
       )}
 
-      {error && <div className="mt-5 rounded-2xl border border-red-400/20 bg-red-400/10 p-4 text-sm text-red-300">{error}</div>}
+      {error && <DataErrorState title="Unable to load analytics" message={error} onRetry={() => setReloadKey((value) => value + 1)} />}
       {loading && <div className="mt-5 space-y-5"><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[1,2,3,4].map((x)=><div key={x} className="skeleton h-28" />)}</div><div className="grid gap-5 xl:grid-cols-2"><div className="skeleton h-[360px]"/><div className="skeleton h-[360px]"/></div></div>}
 
       {data && !loading && (

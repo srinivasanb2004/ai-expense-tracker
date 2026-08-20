@@ -15,6 +15,8 @@ import {
 } from "lucide-react"
 import { useEffect, useState } from "react"
 import Toast, { ToastState } from "@/components/toast"
+import DataErrorState from "@/components/data-error-state"
+import ConfirmModal from "@/components/confirm-modal"
 
 const categories = ["Food", "Transport", "Shopping", "Bills", "Health", "Entertainment", "Education", "Other"]
 const payments = ["UPI", "Card", "Cash", "Bank Transfer", "Other"]
@@ -109,13 +111,17 @@ export default function RecurringPage() {
   const [edit, setEdit] = useState<Recurring | null>(null)
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState<ToastState>(null)
+  const [loadError, setLoadError] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<Recurring | null>(null)
   function say(message:string,type:"success"|"error"="success"){setToast({message,type});setTimeout(()=>setToast(null),2500)}
 
   async function load() {
-    setLoading(true)
-    const response = await fetch("/api/recurring")
-    if (response.ok) setItems(await response.json())
-    setLoading(false)
+    setLoading(true); setLoadError(false)
+    try {
+      const response = await fetch("/api/recurring", { cache: "no-store" })
+      if (!response.ok) throw new Error("Could not load recurring payments")
+      setItems(await response.json())
+    } catch { setLoadError(true) } finally { setLoading(false) }
   }
 
   useEffect(() => {
@@ -123,52 +129,24 @@ export default function RecurringPage() {
   }, [])
 
   async function add(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    const form = e.currentTarget
-    const data = Object.fromEntries(new FormData(form))
-    setBusy(true)
-    setMessage("")
-
-    const response = await fetch("/api/recurring", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    })
-
-    const payload = await response.json().catch(() => ({}))
-    setBusy(false)
-
-    if (!response.ok) {
-      setMessage(payload.error || "Could not add recurring payment.")
-      return
-    }
-
-    form.reset()
-    say("Recurring payment added")
-    await load()
+    e.preventDefault();const form=e.currentTarget;const raw=Object.fromEntries(new FormData(form)) as Record<string,string>;const amount=Number(raw.amount);if(!raw.merchant||!raw.nextDate||!Number.isFinite(amount)||amount<=0)return setMessage("Complete all recurring payment fields.");const previous=items;const tempId=`temp-${Date.now()}`;const optimistic:Recurring={id:tempId,merchant:raw.merchant,amount,category:raw.category,paymentMethod:raw.paymentMethod,frequency:raw.frequency,nextDate:new Date(`${raw.nextDate}T00:00:00`).toISOString(),active:true};setItems(current=>[...current,optimistic]);form.reset();setBusy(true);setMessage("")
+    try{const response=await fetch("/api/recurring",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(raw)});const payload=await response.json().catch(()=>({}));if(!response.ok)throw new Error(payload.error||"Could not add recurring payment.");setItems(current=>current.map(x=>x.id===tempId?payload:x));say("Recurring payment added")}catch(error){setItems(previous);say(error instanceof Error?error.message:"Could not add recurring payment","error")}finally{setBusy(false)}
   }
 
   async function saveEdit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault(); if(!edit)return; setBusy(true)
-    const response=await fetch(`/api/recurring/${edit.id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"edit",...Object.fromEntries(new FormData(e.currentTarget))})})
-    setBusy(false); const d=await response.json().catch(()=>({})); if(!response.ok)return say(d.error||"Could not update payment","error")
-    setEdit(null); say("Recurring payment updated"); await load()
+    e.preventDefault();if(!edit)return;const raw=Object.fromEntries(new FormData(e.currentTarget)) as Record<string,string>;const amount=Number(raw.amount);if(!raw.merchant||!raw.nextDate||!Number.isFinite(amount)||amount<=0)return say("Complete all recurring payment fields.","error");const previous=items;const original=edit;const optimistic:Recurring={...original,merchant:raw.merchant,amount,category:raw.category,paymentMethod:raw.paymentMethod,frequency:raw.frequency,nextDate:new Date(`${raw.nextDate}T00:00:00`).toISOString()};setItems(current=>current.map(x=>x.id===original.id?optimistic:x));setEdit(null);setBusy(true)
+    try{const response=await fetch(`/api/recurring/${original.id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"edit",...raw})});const d=await response.json().catch(()=>({}));if(!response.ok)throw new Error(d.error||"Could not update payment");setItems(current=>current.map(x=>x.id===original.id?d:x));say("Recurring payment updated")}catch(error){setItems(previous);setEdit(original);say(error instanceof Error?error.message:"Could not update payment","error")}finally{setBusy(false)}
   }
 
-  async function remove(id: string) {
-    if (!window.confirm("Delete this recurring payment?")) return
-    await fetch(`/api/recurring/${id}`, { method: "DELETE" })
-    say("Recurring payment deleted")
-    await load()
+  async function remove(item: Recurring) {
+    const previous=items; setDeleteTarget(null); setItems(current=>current.filter(x=>x.id!==item.id))
+    try { const response=await fetch(`/api/recurring/${item.id}`,{method:"DELETE"}); if(!response.ok)throw new Error("Could not delete recurring payment"); say("Recurring payment deleted") }
+    catch(error){setItems(previous);say(error instanceof Error?error.message:"Could not delete recurring payment","error")}
   }
 
   async function toggle(item: Recurring) {
-    await fetch(`/api/recurring/${item.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ active: !item.active }),
-    })
-    await load()
+    const previous=items; setItems(current=>current.map(x=>x.id===item.id?{...x,active:!x.active}:x))
+    try { const response=await fetch(`/api/recurring/${item.id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({active:!item.active})}); if(!response.ok)throw new Error(); const updated=await response.json(); setItems(current=>current.map(x=>x.id===item.id?updated:x)) } catch { setItems(previous); say("Could not update recurring payment","error") }
   }
 
   async function markPaid(id: string) {
@@ -178,11 +156,7 @@ export default function RecurringPage() {
       body: JSON.stringify({ action: "mark_paid" }),
     })
 
-    if (response.ok) {
-      say("Payment recorded and next due date updated")
-    }
-
-    await load()
+    if (response.ok) { const updated=await response.json(); setItems(current=>current.map(x=>x.id===id?updated:x)); say("Payment recorded and next due date updated") } else { say("Could not record payment","error") }
   }
 
   return (
@@ -217,8 +191,11 @@ export default function RecurringPage() {
 
       {message && <p className="mt-3 text-sm muted">{message}</p>}
 
+      {loadError && <DataErrorState title="Unable to load recurring payments" onRetry={load} />}
+
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
-        {items.map((item) => {
+        {!loadError && loading && [1,2,3,4].map(x=><div key={x} className="skeleton h-52"/>)}
+        {!loading && !loadError && items.map((item) => {
           const status = dueStatus(item.nextDate)
           const urgent = item.active && (status.kind === "today" || status.kind === "overdue")
 
@@ -290,7 +267,7 @@ export default function RecurringPage() {
 
                 <button onClick={() => setEdit(item)} className="btn btn-secondary"><Pencil size={16}/>Edit</button>
 
-                <button onClick={() => remove(item.id)} className="btn btn-secondary text-rose-400">
+                <button onClick={() => setDeleteTarget(item)} className="btn btn-secondary text-rose-400">
                   <Trash2 size={16} />Delete
                 </button>
               </div>
@@ -298,9 +275,9 @@ export default function RecurringPage() {
           )
         })}
 
-        {loading && [1,2].map(x=><div key={x} className="skeleton h-64"/>)}
-        {!loading && !items.length && <div className="empty-state lg:col-span-2"><CalendarClock className="mx-auto accent"/><p className="mt-3 font-black">No recurring payments yet</p><p className="mt-1 text-sm muted">Track your first subscription, rent, EMI or repeating bill.</p><button onClick={()=>document.querySelector<HTMLInputElement>('input[name=merchant]')?.focus()} className="btn btn-primary mt-4"><Plus size={16}/>Track first payment</button></div>}
+        {!loading && !loadError && !items.length && <div className="empty-state lg:col-span-2"><CalendarClock className="mx-auto accent"/><p className="mt-3 font-black">No recurring payments yet</p><p className="mt-1 text-sm muted">Track your first subscription, rent, EMI or repeating bill.</p><button onClick={()=>document.querySelector<HTMLInputElement>('input[name=merchant]')?.focus()} className="btn btn-primary mt-4"><Plus size={16}/>Track first payment</button></div>}
       </div>
+      <ConfirmModal open={!!deleteTarget} title="Delete recurring payment?" message={deleteTarget ? `Delete ${deleteTarget.merchant} from recurring payments?` : ""} confirmLabel="Delete payment" onCancel={()=>setDeleteTarget(null)} onConfirm={()=>deleteTarget&&remove(deleteTarget)} />
     </AppShell>
   )
 }

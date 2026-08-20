@@ -2,6 +2,8 @@
 
 import AppShell from "@/components/app-shell"
 import Toast, { ToastState } from "@/components/toast"
+import DataErrorState from "@/components/data-error-state"
+import ConfirmModal from "@/components/confirm-modal"
 
 import {
   AlertTriangle,
@@ -49,6 +51,8 @@ export default function Budgets() {
 
   const [toast, setToast] =
     useState<ToastState>(null)
+  const [loadError, setLoadError] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<Budget | null>(null)
 
   function say(
     message: string,
@@ -67,6 +71,7 @@ export default function Budgets() {
   async function load() {
     try {
       setLoading(true)
+      setLoadError(false)
 
       const response = await fetch(
         "/api/budgets",
@@ -91,10 +96,7 @@ export default function Budgets() {
         error
       )
 
-      say(
-        "Could not load budgets",
-        "error"
-      )
+      setLoadError(true)
     } finally {
       setLoading(false)
     }
@@ -104,143 +106,24 @@ export default function Budgets() {
     load()
   }, [])
 
-  async function save(
-    e: React.FormEvent<HTMLFormElement>
-  ) {
-    e.preventDefault()
-
-    // Save form reference BEFORE await
-    const form = e.currentTarget
-
-    setBusy(true)
-
-    try {
-      const formData =
-        new FormData(form)
-
-      const payload =
-        Object.fromEntries(
-          formData
-        )
-
-      const response = await fetch(
-        editing
-          ? `/api/budgets/${editing.id}`
-          : "/api/budgets",
-        {
-          method: editing
-            ? "PUT"
-            : "POST",
-
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
-
-          body: JSON.stringify(
-            payload
-          ),
-        }
-      )
-
-      const data = await response
-        .json()
-        .catch(() => ({}))
-
-      if (!response.ok) {
-        say(
-          data.error ||
-            "Could not save budget",
-          "error"
-        )
-
-        return
-      }
-
-      form.reset()
-
-      say(
-        editing
-          ? "Budget updated"
-          : "Budget saved"
-      )
-
-      setEditing(null)
-
-      await load()
-    } catch (error) {
-      console.error(
-        "Save budget error:",
-        error
-      )
-
-      say(
-        "Could not save budget",
-        "error"
-      )
-    } finally {
-      setBusy(false)
-    }
+  async function save(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();const form=e.currentTarget;const payload=Object.fromEntries(new FormData(form)) as Record<string,string>;const amount=Number(payload.amount);if(!Number.isFinite(amount)||amount<=0)return say("Budget must be greater than ₹0.","error");const category=editing?.category||payload.category;const previous=budgets;const originalEdit=editing;const existing=originalEdit||budgets.find(x=>x.category===category);const tempId=existing?.id||`temp-${Date.now()}`;const optimistic:Budget={id:tempId,category,amount,spent:existing?.spent||0};setBudgets(current=>{const found=current.some(x=>x.id===tempId||x.category===category);return found?current.map(x=>(x.id===tempId||x.category===category)?optimistic:x):[...current,optimistic].sort((a,b)=>a.category.localeCompare(b.category))});form.reset();setEditing(null);setBusy(true)
+    try{const response=await fetch(originalEdit?`/api/budgets/${originalEdit.id}`:"/api/budgets",{method:originalEdit?"PUT":"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||"Could not save budget");const saved:Budget={...data,spent:optimistic.spent};setBudgets(current=>current.map(x=>(x.id===tempId||x.category===category)?saved:x));say(originalEdit?"Budget updated":"Budget saved")}catch(error){setBudgets(previous);if(originalEdit)setEditing(originalEdit);say(error instanceof Error?error.message:"Could not save budget","error")}finally{setBusy(false)}
   }
 
-  async function deleteBudget(
-    budget: Budget
-  ) {
-    const confirmed =
-      window.confirm(
-        `Delete ${budget.category} budget?`
-      )
-
-    if (!confirmed) return
-
+  async function deleteBudget(budget: Budget) {
+    const previous = budgets
+    setDeleteTarget(null)
+    setBudgets((current) => current.filter((item) => item.id !== budget.id))
     try {
-      const response =
-        await fetch(
-          `/api/budgets/${budget.id}`,
-          {
-            method: "DELETE",
-          }
-        )
-
-      const data = await response
-        .json()
-        .catch(() => ({}))
-
-      if (!response.ok) {
-        say(
-          data.error ||
-            "Could not delete budget",
-          "error"
-        )
-
-        return
-      }
-
+      const response = await fetch(`/api/budgets/${budget.id}`, { method: "DELETE" })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.error || "Could not delete budget")
       say("Budget deleted")
-
-      // Update UI immediately
-      setBudgets((current) =>
-        current.filter(
-          (item) =>
-            item.id !== budget.id
-        )
-      )
-
-      if (
-        editing?.id === budget.id
-      ) {
-        setEditing(null)
-      }
+      if (editing?.id === budget.id) setEditing(null)
     } catch (error) {
-      console.error(
-        "Delete budget error:",
-        error
-      )
-
-      say(
-        "Could not delete budget",
-        "error"
-      )
+      setBudgets(previous)
+      say(error instanceof Error ? error.message : "Could not delete budget", "error")
     }
   }
 
@@ -353,9 +236,11 @@ export default function Budgets() {
         )}
       </form>
 
+      {loadError && <DataErrorState title="Unable to load budgets" onRetry={load} />}
+
       {/* Budget Cards */}
       <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {loading ? (
+        {loadError ? null : loading ? (
           [1, 2, 3].map(
             (item) => (
               <div
@@ -429,11 +314,7 @@ export default function Budgets() {
 
                     <button
                       type="button"
-                      onClick={() =>
-                        deleteBudget(
-                          budget
-                        )
-                      }
+                      onClick={() => setDeleteTarget(budget)}
                       className="grid h-8 w-8 place-items-center rounded-lg text-rose-400 transition hover:bg-rose-500/10 hover:text-rose-300"
                       aria-label={`Delete ${budget.category} budget`}
                     >
@@ -495,6 +376,7 @@ export default function Budgets() {
           </div>
         )}
       </div>
+      <ConfirmModal open={!!deleteTarget} title="Delete budget?" message={deleteTarget ? `Delete the ${deleteTarget.category} budget?` : ""} confirmLabel="Delete budget" onCancel={() => setDeleteTarget(null)} onConfirm={() => deleteTarget && deleteBudget(deleteTarget)} />
     </AppShell>
   )
 }
