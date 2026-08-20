@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import "./globals.css"
+import Providers from "@/components/providers"
 
 export const metadata: Metadata = {
   title: "Smart AI Expense Tracker",
@@ -43,7 +44,9 @@ export default function RootLayout({
         />
       </head>
 
-      <body>{children}</body>
+      <body>
+        <Providers>{children}</Providers>
+      </body>
     </html>
   )
 }
