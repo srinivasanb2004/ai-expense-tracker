@@ -8,6 +8,7 @@ import {
   AlertTriangle,
   Database,
   Download,
+  LogOut,
   Moon,
   ShieldCheck,
   Sun,
@@ -17,8 +18,7 @@ import {
 } from "lucide-react"
 
 import { useEffect, useState } from "react"
-import { useSession } from "next-auth/react"
-
+import { signOut, useSession } from "next-auth/react"
 type Profile = {
   name: string | null
   email: string
@@ -164,7 +164,7 @@ export default function Settings() {
       if (!response.ok) {
         say(
           data.error ||
-            "Could not update profile",
+          "Could not update profile",
           "error"
         )
         return
@@ -214,7 +214,7 @@ export default function Settings() {
       if (!response.ok) {
         say(
           data.error ||
-            "Could not clear data",
+          "Could not clear data",
           "error"
         )
         return
@@ -404,18 +404,16 @@ export default function Settings() {
                 toggleTheme
               }
               aria-label="Toggle theme"
-              className={`relative h-8 w-16 rounded-full p-1 transition ${
-                theme === "light"
-                  ? "bg-emerald-300"
-                  : "bg-white/10"
-              }`}
+              className={`relative h-8 w-16 rounded-full p-1 transition ${theme === "light"
+                ? "bg-emerald-300"
+                : "bg-white/10"
+                }`}
             >
               <span
-                className={`block h-6 w-6 rounded-full bg-emerald-950 transition-transform ${
-                  theme === "light"
-                    ? "translate-x-8"
-                    : ""
-                }`}
+                className={`block h-6 w-6 rounded-full bg-emerald-950 transition-transform ${theme === "light"
+                  ? "translate-x-8"
+                  : ""
+                  }`}
               />
             </button>
           </div>
@@ -433,6 +431,58 @@ export default function Settings() {
 
       {/* Mobile notifications */}
       <MobileNotifications />
+
+      {/* Account / Logout */}
+      <div className="soft-panel mt-8">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-4">
+            <div
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border"
+              style={{
+                borderColor: "var(--line)",
+                background: "var(--secondary)",
+              }}
+            >
+              <LogOut
+                size={19}
+                className="accent"
+              />
+            </div>
+
+            <div>
+              <h3 className="font-black">
+                Account
+              </h3>
+
+              <p className="mt-1 text-sm muted">
+                Signed in as{" "}
+                <span className="font-bold">
+                  {profile?.email || "your account"}
+                </span>
+              </p>
+
+              <p className="mt-1 text-xs muted">
+                Log out securely from WalletIQ on this device.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={async () => {
+              await signOut({
+                redirect: false,
+              })
+
+              window.location.href = "/"
+            }}
+            className="btn btn-secondary cursor-pointer whitespace-nowrap"
+          >
+            <LogOut size={17} />
+            Log out
+          </button>
+        </div>
+      </div>
 
       {/* Danger Zone */}
       <div className="danger-panel mt-8">
