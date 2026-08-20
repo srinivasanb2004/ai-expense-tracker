@@ -923,7 +923,10 @@ export async function syncLowBalanceNotification(
 
 export async function syncBorrowLendNotifications(
   userId: string,
-  now = new Date()
+  now = new Date(),
+  options?: {
+    borrowLendId?: string
+  }
 ) {
   const todayUtc =
     indiaCalendarUtc(now)
@@ -932,34 +935,35 @@ export async function syncBorrowLendNotifications(
     indiaDayStartUtc(now)
 
   const records =
-    await prisma.borrowLend.findMany(
-      {
-        where: {
-          userId,
+    await prisma.borrowLend.findMany({
+      where: {
+        userId,
 
-          status: {
-            not:
-              "SETTLED",
-          },
-
-          dueDate: {
-            not: null,
-          },
+        status: {
+          not: "SETTLED",
         },
 
-        include: {
-          repayments:
-            true,
+        dueDate: {
+          not: null,
         },
-      }
-    )
 
-  for (
-    const record of records
-  ) {
-    if (
-      !record.dueDate
-    ) {
+        ...(options?.borrowLendId
+          ? {
+              id:
+                options.borrowLendId,
+            }
+          : {}),
+      },
+
+      include: {
+        repayments: true,
+      },
+    })
+
+  const notificationIds: string[] = []
+
+  for (const record of records) {
+    if (!record.dueDate) {
       continue
     }
 
@@ -967,30 +971,23 @@ export async function syncBorrowLendNotifications(
       record.repayments.reduce(
         (sum, item) =>
           sum +
-          Number(
-            item.amount
-          ),
+          Number(item.amount),
         0
       )
 
     const remaining =
       Math.max(
-        Number(
-          record.amount
-        ) - repaid,
+        Number(record.amount) -
+          repaid,
         0
       )
 
-    if (
-      remaining <= 0
-    ) {
+    if (remaining <= 0) {
       continue
     }
 
     const due =
-      new Date(
-        record.dueDate
-      )
+      new Date(record.dueDate)
 
     const dueUtc =
       Date.UTC(
@@ -1001,21 +998,21 @@ export async function syncBorrowLendNotifications(
 
     const diffDays =
       Math.round(
-        (dueUtc -
-          todayUtc) /
+        (dueUtc - todayUtc) /
           86400000
       )
 
-    if (
-      diffDays > 1
-    ) {
+    /*
+      Only start reminders
+      one day before due date.
+    */
+
+    if (diffDays > 1) {
       continue
     }
 
     const amount =
-      money(
-        remaining
-      )
+      money(remaining)
 
     const dateLabel =
       due.toLocaleDateString(
@@ -1031,9 +1028,9 @@ export async function syncBorrowLendNotifications(
     let title = ""
     let body = ""
 
-    /* ======================
-       USER BORROWED MONEY
-    ====================== */
+    /* ====================================
+       USER BORROWED
+    ==================================== */
 
     if (
       record.type ===
@@ -1057,9 +1054,7 @@ export async function syncBorrowLendNotifications(
           `You need to repay ${amount} to ${record.person} today. Payment is still pending.`
       } else {
         const days =
-          Math.abs(
-            diffDays
-          )
+          Math.abs(diffDays)
 
         title =
           `Repayment pending · ${record.person} · ${days}d overdue`
@@ -1073,9 +1068,9 @@ export async function syncBorrowLendNotifications(
       }
     }
 
-    /* ======================
-       USER LENT MONEY
-    ====================== */
+    /* ====================================
+       USER LENT
+    ==================================== */
 
     else {
       if (
@@ -1096,9 +1091,7 @@ export async function syncBorrowLendNotifications(
           `${amount} from ${record.person} is expected today and is still pending.`
       } else {
         const days =
-          Math.abs(
-            diffDays
-          )
+          Math.abs(diffDays)
 
         title =
           `Money still pending · ${record.person} · ${days}d overdue`
@@ -1113,20 +1106,27 @@ export async function syncBorrowLendNotifications(
     }
 
     /*
-      One identical Borrow/Lend
-      reminder per IST day.
+      Create/get today's notification
+      and return its ID to caller.
     */
 
-    await createOnce(
-      userId,
-      title,
-      body,
-      {
-        since:
-          todayStart,
-      }
+    const notification =
+      await createOnce(
+        userId,
+        title,
+        body,
+        {
+          since:
+            todayStart,
+        }
+      )
+
+    notificationIds.push(
+      notification.id
     )
   }
+
+  return notificationIds
 }
 
 /* ========================================
