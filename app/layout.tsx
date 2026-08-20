@@ -3,9 +3,9 @@ import "./globals.css"
 import Providers from "@/components/providers"
 
 export const metadata: Metadata = {
-  title: "Smart AI Expense Tracker",
+  title: "WalletIQ",
   description:
-    "Smart AI Expense Tracker — AI-powered personal finance, recurring payments, receipt scanning and spending insights.",
+    "WalletIQ — AI-powered personal finance, expense tracking, budgets, recurring payments, receipt scanning and spending insights.",
   icons: {
     icon: "/icon.png",
     shortcut: "/icon.png",

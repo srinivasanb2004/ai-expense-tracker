@@ -1,4 +1,4 @@
-# Smart AI Expense Tracker
+# WalletIQ
 
 AI-powered personal finance tracker built with Next.js, Auth.js, Prisma, Supabase/PostgreSQL and Gemini.
 
