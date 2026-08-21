@@ -18,7 +18,7 @@ import {
   Pencil,
   UserRound,
 } from "lucide-react"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import Toast, { ToastState } from "@/components/toast"
 
 type Repayment = {
@@ -111,6 +111,82 @@ function dueInfo(item: RecordItem): DueInfo {
   }
 
   return { kind: "upcoming", label: `Due in ${diff} days`, copy: label }
+}
+
+
+function DateField({
+  name,
+  placeholder,
+  required = false,
+  defaultValue = "",
+  max,
+}: {
+  name: string
+  placeholder: string
+  required?: boolean
+  defaultValue?: string
+  max?: string
+}) {
+  const [value, setValue] = useState(defaultValue)
+  const [focused, setFocused] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    setValue(defaultValue)
+    setFocused(Boolean(defaultValue))
+  }, [defaultValue])
+
+  useEffect(() => {
+    const form = inputRef.current?.form
+    if (!form) return
+
+    function handleReset() {
+      setValue(defaultValue)
+      setFocused(Boolean(defaultValue))
+    }
+
+    form.addEventListener("reset", handleReset)
+    return () => form.removeEventListener("reset", handleReset)
+  }, [defaultValue])
+
+  const showDateInput = focused || Boolean(value)
+
+  function openPicker() {
+    const input = inputRef.current
+    if (!input) return
+
+    setFocused(true)
+
+    requestAnimationFrame(() => {
+      try {
+        input.showPicker?.()
+      } catch {
+        // Mobile browsers may open the native date picker automatically.
+      }
+    })
+  }
+
+  return (
+    <input
+      ref={inputRef}
+      name={name}
+      type={showDateInput ? "date" : "text"}
+      value={value}
+      placeholder={placeholder}
+      required={required}
+      max={showDateInput ? max : undefined}
+      readOnly={!showDateInput}
+      onFocus={openPicker}
+      onClick={openPicker}
+      onBlur={() => {
+        if (!value) setFocused(false)
+      }}
+      onChange={(e) => {
+        setValue(e.target.value)
+      }}
+      className="input w-full"
+    />
+  )
 }
 
 export default function BorrowLendPage() {
@@ -310,8 +386,8 @@ export default function BorrowLendPage() {
             <option value="LENT">I lent money</option>
           </select>
           <input name="amount" className="input" type="number" min="1" step="0.01" placeholder="Amount ₹" required />
-          <input name="startDate" className="input" type="date" required />
-          <input name="dueDate" className="input" type="date" />
+          <DateField name="startDate" placeholder="Start date" required />
+          <DateField name="dueDate" placeholder="Due date" />
           <input name="notes" className="input md:col-span-2" placeholder="Reason / notes (optional)" />
           <button disabled={busy} className="btn btn-primary md:col-span-2">
             {busy ? "Saving..." : "Save record"}
@@ -319,7 +395,7 @@ export default function BorrowLendPage() {
         </form>
       )}
 
-      {edit && <form onSubmit={saveEdit} className="soft-panel mt-5 grid gap-3 md:grid-cols-2"><input name="person" defaultValue={edit.person} className="input" required/><input name="phone" defaultValue={edit.phone||""} className="input" placeholder="Phone (optional)"/><select name="type" defaultValue={edit.type} className="input"><option value="BORROWED">I borrowed money</option><option value="LENT">I lent money</option></select><input name="amount" defaultValue={edit.amount} className="input" type="number" min={edit.repaid||1} step=".01" required/><input name="startDate" defaultValue={new Date(edit.startDate).toISOString().slice(0,10)} className="input" type="date" required/><input name="dueDate" defaultValue={edit.dueDate?new Date(edit.dueDate).toISOString().slice(0,10):""} className="input" type="date"/><input name="notes" defaultValue={edit.notes||""} className="input md:col-span-2" placeholder="Notes"/><div className="flex gap-2 md:col-span-2"><button disabled={busy} className="btn btn-primary">Update record</button><button type="button" onClick={()=>setEdit(null)} className="btn btn-secondary">Cancel</button></div></form>}
+      {edit && <form onSubmit={saveEdit} className="soft-panel mt-5 grid gap-3 md:grid-cols-2"><input name="person" defaultValue={edit.person} className="input" required/><input name="phone" defaultValue={edit.phone||""} className="input" placeholder="Phone (optional)"/><select name="type" defaultValue={edit.type} className="input"><option value="BORROWED">I borrowed money</option><option value="LENT">I lent money</option></select><input name="amount" defaultValue={edit.amount} className="input" type="number" min={edit.repaid||1} step=".01" required/><DateField key={`start-${edit.id}`} name="startDate" placeholder="Start date" defaultValue={new Date(edit.startDate).toISOString().slice(0,10)} required/><DateField key={`due-${edit.id}`} name="dueDate" placeholder="Due date" defaultValue={edit.dueDate?new Date(edit.dueDate).toISOString().slice(0,10):""}/><input name="notes" defaultValue={edit.notes||""} className="input md:col-span-2" placeholder="Notes"/><div className="flex gap-2 md:col-span-2"><button disabled={busy} className="btn btn-primary">Update record</button><button type="button" onClick={()=>setEdit(null)} className="btn btn-secondary">Cancel</button></div></form>}
 
       {message && <p className="mt-3 text-sm font-semibold accent">{message}</p>}
 
@@ -400,7 +476,7 @@ export default function BorrowLendPage() {
                       placeholder={`Up to ${money(item.remaining)}`}
                       required
                     />
-                    <input name="date" className="input" type="date" required />
+                    <DateField name="date" placeholder="Repayment date" max={new Date().toISOString().slice(0, 10)} required />
                     <input name="notes" className="input sm:col-span-2" placeholder="Repayment note (optional)" />
 
                     {item.type === "BORROWED" && (
