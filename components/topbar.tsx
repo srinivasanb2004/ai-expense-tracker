@@ -7,7 +7,7 @@ import {
   Bot,
   Plus,
   RefreshCw,
-  NotebookPen,
+  BarChart3,
   ScanLine,
   Settings,
 } from "lucide-react"
@@ -79,23 +79,12 @@ export default function Topbar() {
     setRefreshing(true)
 
     try {
-      /*
-        First ask the backend to generate
-        any notifications that are currently
-        due.
-      */
-
       await fetch(
         "/api/notifications",
         {
           method: "POST",
         }
       )
-
-      /*
-        Then fetch the latest notification
-        list + unread count.
-      */
 
       await loadNotifications()
     } catch (error) {
@@ -119,11 +108,6 @@ export default function Topbar() {
     if (!nextOpen) {
       return
     }
-
-    /*
-      When opening the bell, do a normal
-      refresh once.
-    */
 
     await refreshNotifications()
   }
@@ -235,7 +219,7 @@ export default function Topbar() {
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
-        {/* SCAN */}
+        {/* DESKTOP SCAN */}
 
         <Link
           href="/scan"
@@ -261,44 +245,47 @@ export default function Topbar() {
           </span>
         </Link>
 
-        {/* MOBILE NOTES */}
-
-        <Link
-          href="/notes"
-          aria-label="Notes"
-          className="grid h-10 w-10 sm:h-11 sm:w-11 shrink-0 cursor-pointer place-items-center rounded-xl border transition hover:-translate-y-0.5 md:hidden"
-          style={{
-            borderColor: "var(--line)",
-            background: "var(--secondary)",
-            color: "var(--text)",
-          }}
-        >
-          <NotebookPen size={19} />
-        </Link>
-
-        {/* MOBILE AI */}
+        {/* MOBILE AI - 1ST */}
 
         <Link
           href="/assistant"
           aria-label="AI Assistant"
-          className="grid h-10 w-10 sm:h-11 sm:w-11 shrink-0 cursor-pointer place-items-center rounded-xl border transition hover:-translate-y-0.5 md:hidden"
+          className="grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-xl border transition hover:-translate-y-0.5 sm:h-11 sm:w-11 md:hidden"
           style={{
             borderColor:
               "var(--line)",
 
             background:
-              "linear-gradient(135deg,#6ee7b7,#22c55e)",
+              "var(--secondary)",
 
             color:
-              "#052018",
+              "var(--text)",
           }}
         >
-          <Bot
-            size={19}
-          />
+          <Bot size={19} />
         </Link>
 
-        {/* NOTIFICATIONS */}
+        {/* MOBILE ANALYTICS - 2ND */}
+
+        <Link
+          href="/analytics"
+          aria-label="Analytics"
+          className="grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-xl border transition hover:-translate-y-0.5 sm:h-11 sm:w-11 md:hidden"
+          style={{
+            borderColor:
+              "var(--line)",
+
+            background:
+              "var(--secondary)",
+
+            color:
+              "var(--text)",
+          }}
+        >
+          <BarChart3 size={19} />
+        </Link>
+
+        {/* NOTIFICATIONS - 3RD */}
 
         <div
           ref={box}
@@ -310,7 +297,7 @@ export default function Topbar() {
             onClick={
               toggleNotifications
             }
-            className="relative grid h-10 w-10 sm:h-11 sm:w-11 shrink-0 cursor-pointer place-items-center rounded-xl border transition hover:-translate-y-0.5"
+            className="relative grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-xl border transition hover:-translate-y-0.5 sm:h-11 sm:w-11"
             style={{
               borderColor:
                 "var(--line)",
@@ -337,8 +324,6 @@ export default function Topbar() {
 
           {open && (
             <div className="notification-popover absolute right-0 top-14 w-[390px] max-w-[calc(100vw-24px)] overflow-hidden rounded-3xl border shadow-2xl">
-              {/* HEADER */}
-
               <div
                 className="flex items-center justify-between gap-3 border-b p-4"
                 style={{
@@ -359,8 +344,6 @@ export default function Topbar() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {/* MANUAL REFRESH */}
-
                   <button
                     type="button"
                     onClick={
@@ -383,8 +366,6 @@ export default function Topbar() {
                     />
                   </button>
 
-                  {/* MARK ALL READ */}
-
                   {unread > 0 && (
                     <button
                       type="button"
@@ -398,8 +379,6 @@ export default function Topbar() {
                   )}
                 </div>
               </div>
-
-              {/* LIST */}
 
               <div className="max-h-[430px] overflow-y-auto p-2">
                 {items.length ? (
@@ -472,8 +451,7 @@ export default function Topbar() {
                   )
                 ) : (
                   <p className="p-8 text-center text-sm muted">
-                    No notifications
-                    yet.
+                    No notifications yet.
                   </p>
                 )}
               </div>
@@ -481,12 +459,12 @@ export default function Topbar() {
           )}
         </div>
 
-        {/* MOBILE SETTINGS */}
+        {/* MOBILE SETTINGS - 4TH */}
 
         <Link
           href="/settings"
           aria-label="Settings"
-          className="grid h-10 w-10 sm:h-11 sm:w-11 shrink-0 cursor-pointer place-items-center rounded-xl border transition hover:-translate-y-0.5 md:hidden"
+          className="grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-xl border transition hover:-translate-y-0.5 sm:h-11 sm:w-11 md:hidden"
           style={{
             borderColor:
               "var(--line)",

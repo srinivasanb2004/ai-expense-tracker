@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { signOut } from "next-auth/react"
+
 import {
   LayoutDashboard,
   ReceiptText,
@@ -40,7 +41,7 @@ const mobileItems = [
   ["/expenses", "Expenses", ReceiptText],
   ["/income", "Income", ArrowUpCircle],
   ["/budgets", "Budgets", WalletCards],
-  ["/analytics", "Analytics", ChartNoAxesCombined],
+  ["/notes", "Notes", NotebookPen],
 ] as const
 
 export default function Sidebar() {
