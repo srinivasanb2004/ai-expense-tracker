@@ -9,6 +9,7 @@ import Link from "next/link"
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react"
 
@@ -55,6 +56,64 @@ function dateInput(value: string) {
   return new Date(value)
     .toISOString()
     .slice(0, 10)
+}
+
+
+function DateField({
+  name,
+  placeholder,
+  required = false,
+  defaultValue = "",
+  max,
+}: {
+  name: string
+  placeholder: string
+  required?: boolean
+  defaultValue?: string
+  max?: string
+}) {
+  const [value, setValue] = useState(defaultValue)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    setValue(defaultValue)
+  }, [defaultValue])
+
+  useEffect(() => {
+    const form = inputRef.current?.form
+    if (!form) return
+
+    function handleReset() {
+      setValue(defaultValue)
+    }
+
+    form.addEventListener("reset", handleReset)
+    return () => form.removeEventListener("reset", handleReset)
+  }, [defaultValue])
+
+  return (
+    <div className="relative min-w-0">
+      <input
+        ref={inputRef}
+        name={name}
+        type="date"
+        value={value}
+        required={required}
+        max={max}
+        onChange={(e) => setValue(e.target.value)}
+        className={`input w-full ${!value ? "text-transparent" : ""}`}
+      />
+
+      {!value && (
+        <span
+          className="pointer-events-none absolute inset-y-0 left-0 flex items-center px-4 text-sm"
+          style={{ color: "var(--muted)" }}
+        >
+          {placeholder}
+        </span>
+      )}
+    </div>
+  )
 }
 
 export default function Expenses() {
@@ -345,17 +404,16 @@ export default function Expenses() {
             )}
           </select>
 
-          <input
+          <DateField
+            key={`expense-date-${editing?.id || "new"}`}
             name="date"
+            placeholder="Expense date"
             defaultValue={
               editing
-                ? dateInput(
-                    editing.date
-                  )
+                ? dateInput(editing.date)
                 : ""
             }
-            className="input"
-            type="date"
+            max={new Date().toISOString().slice(0, 10)}
             required
           />
 

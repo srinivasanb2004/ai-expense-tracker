@@ -17,6 +17,7 @@ import {
 
 import {
   useEffect,
+  useRef,
   useState,
 } from "react"
 
@@ -294,6 +295,64 @@ function dueStatus(
     daysOverdue:
       0,
   }
+}
+
+
+function DateField({
+  name,
+  placeholder,
+  required = false,
+  defaultValue = "",
+  max,
+}: {
+  name: string
+  placeholder: string
+  required?: boolean
+  defaultValue?: string
+  max?: string
+}) {
+  const [value, setValue] = useState(defaultValue)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    setValue(defaultValue)
+  }, [defaultValue])
+
+  useEffect(() => {
+    const form = inputRef.current?.form
+    if (!form) return
+
+    function handleReset() {
+      setValue(defaultValue)
+    }
+
+    form.addEventListener("reset", handleReset)
+    return () => form.removeEventListener("reset", handleReset)
+  }, [defaultValue])
+
+  return (
+    <div className="relative min-w-0">
+      <input
+        ref={inputRef}
+        name={name}
+        type="date"
+        value={value}
+        required={required}
+        max={max}
+        onChange={(e) => setValue(e.target.value)}
+        className={`input w-full ${!value ? "text-transparent" : ""}`}
+      />
+
+      {!value && (
+        <span
+          className="pointer-events-none absolute inset-y-0 left-0 flex items-center px-4 text-sm"
+          style={{ color: "var(--muted)" }}
+        >
+          {placeholder}
+        </span>
+      )}
+    </div>
+  )
 }
 
 export default function RecurringPage() {
@@ -1079,10 +1138,9 @@ export default function RecurringPage() {
           )}
         </select>
 
-        <input
+        <DateField
           name="nextDate"
-          className="input"
-          type="date"
+          placeholder="Next due date"
           required
         />
 
@@ -1201,20 +1259,15 @@ export default function RecurringPage() {
             )}
           </select>
 
-          <input
+          <DateField
+            key={`next-date-${edit.id}`}
             name="nextDate"
+            placeholder="Next due date"
             defaultValue={
-              new Date(
-                edit.nextDate
-              )
+              new Date(edit.nextDate)
                 .toISOString()
-                .slice(
-                  0,
-                  10
-                )
+                .slice(0, 10)
             }
-            className="input"
-            type="date"
             required
           />
 
