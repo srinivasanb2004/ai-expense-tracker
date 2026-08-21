@@ -7,6 +7,7 @@ import {
   Bot,
   Plus,
   RefreshCw,
+  NotebookPen,
   ScanLine,
   Settings,
 } from "lucide-react"
@@ -258,6 +259,21 @@ export default function Topbar() {
           <span>
             Scan
           </span>
+        </Link>
+
+        {/* MOBILE NOTES */}
+
+        <Link
+          href="/notes"
+          aria-label="Notes"
+          className="grid h-11 w-11 shrink-0 cursor-pointer place-items-center rounded-xl border transition hover:-translate-y-0.5 md:hidden"
+          style={{
+            borderColor: "var(--line)",
+            background: "var(--secondary)",
+            color: "var(--text)",
+          }}
+        >
+          <NotebookPen size={19} />
         </Link>
 
         {/* MOBILE AI */}

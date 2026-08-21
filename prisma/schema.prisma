@@ -25,6 +25,7 @@ model User {
   pushSubscriptions PushSubscription[]
   pushPreference PushPreference?
   pushDeliveries PushDelivery[]
+  notes          Note[]
 }
 
 model Expense {
@@ -176,4 +177,36 @@ model PushDelivery {
 
   @@unique([notificationId, subscriptionId])
   @@index([userId, createdAt])
+}
+
+
+model Note {
+  id        String     @id @default(cuid())
+  userId    String
+  title     String?
+  content   String?
+  type      String     @default("TEXT")
+  pinned    Boolean    @default(false)
+  archived  Boolean    @default(false)
+  color     String     @default("default")
+  tags      String[]   @default([])
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     NoteItem[]
+
+  @@index([userId, archived, pinned, updatedAt])
+}
+
+model NoteItem {
+  id        String   @id @default(cuid())
+  noteId    String
+  text      String
+  checked   Boolean  @default(false)
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@index([noteId, position])
 }

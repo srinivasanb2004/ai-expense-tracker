@@ -16,6 +16,7 @@ export default auth((req) => {
     "/settings",
     "/recurring",
     "/borrow-lend",
+    "/notes",
   ]
 
   const isProtectedRoute = protectedRoutes.some(
@@ -56,5 +57,6 @@ export const config = {
     "/settings/:path*",
     "/recurring/:path*",
     "/borrow-lend/:path*",
+    "/notes/:path*",
   ],
 }

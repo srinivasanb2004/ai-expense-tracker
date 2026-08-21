@@ -587,3 +587,60 @@ html.light .network-banner-online {
 /* Auth transition spinner */
 .auth-spinner{width:16px;height:16px;border:2px solid currentColor;border-right-color:transparent;border-radius:999px;display:inline-block;animation:auth-spin .7s linear infinite}
 @keyframes auth-spin{to{transform:rotate(360deg)}}
+
+/* =========================================================
+   WALLETIQ NOTES - PHASE 1
+========================================================= */
+.note-card {
+  box-shadow: 0 16px 44px var(--shadow), inset 0 1px 0 rgba(255,255,255,.025);
+}
+.note-card:hover {
+  border-color: rgba(110,231,183,.42) !important;
+  box-shadow: 0 20px 56px var(--shadow), 0 0 24px rgba(52,211,153,.08);
+}
+.notes-fab {
+  display:grid;
+  width:62px;
+  height:62px;
+  place-items:center;
+  border:1px solid rgba(110,231,183,.45);
+  border-radius:20px;
+  background:linear-gradient(135deg,#86efac,#34d399);
+  color:#052c21;
+  box-shadow:0 16px 44px rgba(16,185,129,.28),0 0 24px rgba(52,211,153,.14);
+  cursor:pointer;
+  transition:.2s;
+}
+.notes-fab:hover{transform:translateY(-2px) scale(1.02)}
+.notes-fab-option {
+  display:flex;
+  min-width:150px;
+  align-items:center;
+  justify-content:flex-start;
+  gap:.65rem;
+  min-height:46px;
+  padding:.7rem 1rem;
+  border:1px solid rgba(110,231,183,.28);
+  border-radius:16px;
+  background:color-mix(in srgb,var(--panel) 95%,transparent);
+  color:var(--text);
+  font-size:.84rem;
+  font-weight:850;
+  box-shadow:0 14px 36px var(--shadow);
+  backdrop-filter:blur(22px);
+  cursor:pointer;
+}
+.note-editor {
+  box-shadow:0 30px 100px rgba(0,0,0,.46),0 0 34px rgba(52,211,153,.08);
+  backdrop-filter:blur(24px);
+}
+html.light .note-card {
+  box-shadow:0 14px 40px rgba(23,55,44,.09),inset 0 1px 0 rgba(255,255,255,.8);
+}
+html.light .notes-fab-option {
+  background:rgba(255,255,255,.97);
+  box-shadow:0 14px 36px rgba(23,55,44,.14);
+}
+@media(max-width:390px){
+  .notes-fab{width:58px;height:58px;border-radius:18px}
+}

@@ -15,6 +15,7 @@ import {
   LogOut,
   ArrowUpCircle,
   HandCoins,
+  NotebookPen,
 } from "lucide-react"
 
 import Logo from "./logo"
@@ -28,6 +29,7 @@ const items = [
   ["/budgets", "Budgets", WalletCards],
   ["/analytics", "Analytics", ChartNoAxesCombined],
   ["/assistant", "AI Assistant", Bot],
+  ["/notes", "Notes", NotebookPen],
   ["/scan", "Scan Receipt", ScanLine],
   ["/settings", "Settings", Settings],
 ] as const
