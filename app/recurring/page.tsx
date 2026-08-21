@@ -312,46 +312,56 @@ function DateField({
   max?: string
 }) {
   const [value, setValue] = useState(defaultValue)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const [focused, setFocused] = useState(false)
 
   useEffect(() => {
     setValue(defaultValue)
   }, [defaultValue])
 
-  useEffect(() => {
-    const form = inputRef.current?.form
-    if (!form) return
-
-    function handleReset() {
-      setValue(defaultValue)
-    }
-
-    form.addEventListener("reset", handleReset)
-    return () => form.removeEventListener("reset", handleReset)
-  }, [defaultValue])
+  const showDateInput = focused || Boolean(value)
 
   return (
-    <div className="relative min-w-0">
-      <input
-        ref={inputRef}
-        name={name}
-        type="date"
-        value={value}
-        required={required}
-        max={max}
-        onChange={(e) => setValue(e.target.value)}
-        className={`input w-full ${!value ? "text-transparent" : ""}`}
-      />
+    <input
+      name={name}
+      type={showDateInput ? "date" : "text"}
+      value={value}
+      placeholder={placeholder}
+      required={required}
+      max={showDateInput ? max : undefined}
+      readOnly={!showDateInput}
+      onFocus={(e) => {
+        setFocused(true)
 
-      {!value && (
-        <span
-          className="pointer-events-none absolute inset-y-0 left-0 flex items-center px-4 text-sm"
-          style={{ color: "var(--muted)" }}
-        >
-          {placeholder}
-        </span>
-      )}
-    </div>
+        requestAnimationFrame(() => {
+          try {
+            e.currentTarget.showPicker?.()
+          } catch {
+            // Some mobile browsers open
+            // the picker automatically.
+          }
+        })
+      }}
+      onClick={(e) => {
+        if (!focused) {
+          setFocused(true)
+        }
+
+        requestAnimationFrame(() => {
+          try {
+            e.currentTarget.showPicker?.()
+          } catch {}
+        })
+      }}
+      onBlur={() => {
+        if (!value) {
+          setFocused(false)
+        }
+      }}
+      onChange={(e) => {
+        setValue(e.target.value)
+      }}
+      className="input w-full"
+    />
   )
 }
 
