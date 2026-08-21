@@ -236,9 +236,9 @@ async function compressReceiptImage(
 
     if (
       blob.size >=
-        file.size &&
+      file.size &&
       largest <=
-        MAX_IMAGE_DIMENSION
+      MAX_IMAGE_DIMENSION
     ) {
       return file
     }
@@ -386,8 +386,8 @@ export default function Scan() {
       if (
         uploadFile.size >
         8 *
-          1024 *
-          1024
+        1024 *
+        1024
       ) {
         throw new Error(
           "Receipt image is still too large after optimization. Please retake the photo at a lower resolution."
@@ -428,10 +428,10 @@ export default function Scan() {
       ) {
         if (
           response.status ===
-            413 ||
+          413 ||
           String(
             payload.error ||
-              ""
+            ""
           )
             .toLowerCase()
             .includes(
@@ -454,7 +454,7 @@ export default function Scan() {
 
         throw new Error(
           payload.error ||
-            "Receipt scan failed."
+          "Receipt scan failed."
         )
       }
 
@@ -474,28 +474,28 @@ export default function Scan() {
         merchant:
           String(
             payload.merchant ||
-              "Unknown"
+            "Unknown"
           ),
 
         amount:
           Number(
             payload.amount ||
-              0
+            0
           ),
 
         date:
           payload.date
             ? String(
-                payload.date
-              )
+              payload.date
+            )
             : null,
 
         tax:
           payload.tax == null
             ? null
             : Number(
-                payload.tax
-              ),
+              payload.tax
+            ),
 
         category:
           categories.includes(
@@ -504,8 +504,8 @@ export default function Scan() {
             )
           )
             ? String(
-                payload.category
-              )
+              payload.category
+            )
             : "Other",
 
         paymentMethod:
@@ -515,15 +515,15 @@ export default function Scan() {
             )
           )
             ? String(
-                payload.paymentMethod
-              )
+              payload.paymentMethod
+            )
             : "Other",
 
         notes:
           payload.notes
             ? String(
-                payload.notes
-              )
+              payload.notes
+            )
             : null,
       }
 
@@ -543,12 +543,12 @@ export default function Scan() {
           : "Receipt extracted. Review the fields before saving."
       )
     } catch (
-      error
+    error
     ) {
       if (
         !navigator.onLine ||
         error instanceof
-          TypeError
+        TypeError
       ) {
         setConnectionError(
           true
@@ -606,12 +606,12 @@ export default function Scan() {
     if (
       data.date &&
       data.date >
-        new Date()
-          .toISOString()
-          .slice(
-            0,
-            10
-          )
+      new Date()
+        .toISOString()
+        .slice(
+          0,
+          10
+        )
     ) {
       setValidationError(
         "Receipt date cannot be in the future."
@@ -664,7 +664,7 @@ export default function Scan() {
                     data.notes,
 
                     data.tax !=
-                    null
+                      null
                       ? `GST/Tax: ₹${data.tax}`
                       : null,
                   ]
@@ -700,7 +700,7 @@ export default function Scan() {
 
         throw new Error(
           payload.error ||
-            "Could not save expense."
+          "Could not save expense."
         )
       }
 
@@ -711,12 +711,12 @@ export default function Scan() {
       setData(null)
       setFile(null)
     } catch (
-      error
+    error
     ) {
       if (
         !navigator.onLine ||
         error instanceof
-          TypeError
+        TypeError
       ) {
         setConnectionError(
           true
@@ -834,12 +834,12 @@ export default function Scan() {
         </p>
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+      <div className="mt-6 grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         {/* UPLOAD */}
 
-        <div className="soft-panel">
-          <label className="grid min-h-80 cursor-pointer place-items-center rounded-[22px] border border-dashed border-emerald-300/35 bg-emerald-300/5 p-6 text-center transition hover:bg-emerald-300/10">
-            <div>
+        <div className="soft-panel min-w-0 overflow-hidden">
+          <label className="grid min-h-80 w-full min-w-0 max-w-full cursor-pointer place-items-center overflow-hidden rounded-[22px] border border-dashed border-emerald-300/35 bg-emerald-300/5 p-4 text-center transition hover:bg-emerald-300/10 sm:p-6">
+            <div className="w-full min-w-0 max-w-full">
               <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-emerald-300/10 accent">
                 <UploadCloud
                   size={
@@ -866,28 +866,18 @@ export default function Scan() {
               </p>
 
               {file && (
-                <div className="mt-5 inline-flex items-center gap-2 rounded-xl border border-emerald-300/20 bg-emerald-300/10 px-3 py-2 text-sm accent">
+                <div className="mx-auto mt-5 flex w-full max-w-full min-w-0 items-center gap-2 overflow-hidden rounded-xl border border-emerald-300/20 bg-emerald-300/10 px-3 py-2 text-sm accent">
                   <FileText
-                    size={
-                      15
-                    }
+                    size={15}
+                    className="shrink-0"
                   />
 
-                  <span className="max-w-[260px] truncate">
-                    {
-                      file.name
-                    }
+                  <span className="min-w-0 flex-1 truncate text-left">
+                    {file.name}
                   </span>
 
-                  <span className="text-[10px] muted">
-                    {(
-                      file.size /
-                      1024 /
-                      1024
-                    ).toFixed(
-                      1
-                    )}
-                    MB
+                  <span className="shrink-0 whitespace-nowrap text-[10px] muted">
+                    {(file.size / 1024 / 1024).toFixed(1)} MB
                   </span>
                 </div>
               )}
@@ -903,7 +893,7 @@ export default function Scan() {
                 chooseFile(
                   e.target
                     .files?.[0] ||
-                    null
+                  null
                 )
               }
             />
@@ -950,7 +940,7 @@ export default function Scan() {
 
         {/* REVIEW */}
 
-        <div className="soft-panel">
+        <div className="soft-panel min-w-0 overflow-hidden">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="eyebrow">
@@ -1072,10 +1062,10 @@ export default function Scan() {
                           e.target
                             .value
                             ? Number(
-                                e
-                                  .target
-                                  .value
-                              )
+                              e
+                                .target
+                                .value
+                            )
                             : null,
                       }
                     )
@@ -1238,7 +1228,7 @@ export default function Scan() {
                 disabled={
                   saving ||
                   data.amount <=
-                    0
+                  0
                 }
                 className="btn btn-primary sm:col-span-2 disabled:opacity-50"
               >
