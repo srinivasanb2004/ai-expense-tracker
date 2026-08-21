@@ -341,21 +341,7 @@ export default function Settings() {
           </form>
         </div>
 
-        {/* Privacy */}
-        <div className="soft-panel">
-          <ShieldCheck className="accent" />
-
-          <h3 className="mt-4 font-black">
-            Privacy
-          </h3>
-
-          <p className="mt-2 text-sm leading-6 muted">
-            Your financial records are
-            scoped to your authenticated
-            user account.
-          </p>
-        </div>
-
+      
         {/* Export */}
         <div className="soft-panel">
           <Database className="accent" />
@@ -432,6 +418,21 @@ export default function Settings() {
 
       {/* Device push notifications */}
       <PushNotificationsSettings />
+
+       {/* Privacy */}
+        <div className="soft-panel">
+          <ShieldCheck className="accent" />
+
+          <h3 className="mt-4 font-black">
+            Privacy
+          </h3>
+
+          <p className="mt-2 text-sm leading-6 muted">
+            Your financial records are
+            scoped to your authenticated
+            user account.
+          </p>
+        </div>
 
       {/* Account / Logout */}
       <div className="soft-panel mt-8">
