@@ -198,7 +198,7 @@ export default function Topbar() {
 
   return (
     <header
-      className="sticky top-0 z-30 flex h-[76px] w-full items-center justify-between gap-2 border-b px-3 backdrop-blur-xl md:h-20 md:px-8"
+      className="sticky top-0 z-30 flex h-[72px] w-full min-w-0 items-center justify-between gap-1.5 border-b px-2.5 backdrop-blur-xl sm:gap-2 sm:px-3 md:h-20 md:px-8"
       style={{
         background:
           "color-mix(in srgb, var(--bg) 88%, transparent)",
@@ -212,7 +212,7 @@ export default function Topbar() {
     >
       {/* MOBILE LOGO */}
 
-      <div className="min-w-0 flex-1 md:hidden">
+      <div className="min-w-0 flex-1 overflow-hidden md:hidden">
         <Logo />
       </div>
 
@@ -234,7 +234,7 @@ export default function Topbar() {
         </h1>
       </div>
 
-      <div className="ml-auto flex shrink-0 items-center gap-2">
+      <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
         {/* SCAN */}
 
         <Link
@@ -266,7 +266,7 @@ export default function Topbar() {
         <Link
           href="/notes"
           aria-label="Notes"
-          className="grid h-11 w-11 shrink-0 cursor-pointer place-items-center rounded-xl border transition hover:-translate-y-0.5 md:hidden"
+          className="grid h-10 w-10 sm:h-11 sm:w-11 shrink-0 cursor-pointer place-items-center rounded-xl border transition hover:-translate-y-0.5 md:hidden"
           style={{
             borderColor: "var(--line)",
             background: "var(--secondary)",
@@ -281,7 +281,7 @@ export default function Topbar() {
         <Link
           href="/assistant"
           aria-label="AI Assistant"
-          className="grid h-11 w-11 shrink-0 cursor-pointer place-items-center rounded-xl border transition hover:-translate-y-0.5 md:hidden"
+          className="grid h-10 w-10 sm:h-11 sm:w-11 shrink-0 cursor-pointer place-items-center rounded-xl border transition hover:-translate-y-0.5 md:hidden"
           style={{
             borderColor:
               "var(--line)",
@@ -310,7 +310,7 @@ export default function Topbar() {
             onClick={
               toggleNotifications
             }
-            className="relative grid h-11 w-11 shrink-0 cursor-pointer place-items-center rounded-xl border transition hover:-translate-y-0.5"
+            className="relative grid h-10 w-10 sm:h-11 sm:w-11 shrink-0 cursor-pointer place-items-center rounded-xl border transition hover:-translate-y-0.5"
             style={{
               borderColor:
                 "var(--line)",
@@ -486,7 +486,7 @@ export default function Topbar() {
         <Link
           href="/settings"
           aria-label="Settings"
-          className="grid h-11 w-11 shrink-0 cursor-pointer place-items-center rounded-xl border transition hover:-translate-y-0.5 md:hidden"
+          className="grid h-10 w-10 sm:h-11 sm:w-11 shrink-0 cursor-pointer place-items-center rounded-xl border transition hover:-translate-y-0.5 md:hidden"
           style={{
             borderColor:
               "var(--line)",

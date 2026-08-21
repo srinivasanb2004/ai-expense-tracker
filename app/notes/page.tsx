@@ -399,23 +399,46 @@ export default function NotesPage() {
       </div>
 
       {draft && editing && (
-        <div className="fixed inset-0 z-[110] flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4">
-          <div className="note-editor flex max-h-[94vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-[30px] border sm:rounded-[30px]" style={{ background: colorValue(draft.color), borderColor: "var(--line)" }}>
-            <div className="flex items-center justify-between gap-3 border-b px-4 py-3" style={{ borderColor: "var(--line)" }}>
-              <button type="button" onClick={closeEditor} className="icon-button" aria-label="Close note"><X size={18} /></button>
-              <span className={`text-xs font-bold ${saveState === "error" ? "text-rose-400" : "muted"}`}>
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 px-3 py-[max(14px,env(safe-area-inset-top))] backdrop-blur-sm sm:p-4">
+          <div
+            className="note-editor flex h-[calc(100dvh-28px)] max-h-[760px] w-full min-w-0 max-w-2xl flex-col overflow-hidden rounded-[26px] border shadow-2xl sm:h-auto sm:max-h-[94vh] sm:rounded-[30px]"
+            style={{
+              background: colorValue(draft.color),
+              borderColor: "var(--line)",
+            }}
+          >
+            <div
+              className="flex shrink-0 items-center justify-between gap-3 border-b px-3 py-3 sm:px-4"
+              style={{ borderColor: "var(--line)" }}
+            >
+              <button
+                type="button"
+                onClick={closeEditor}
+                className="icon-button shrink-0"
+                aria-label="Close note"
+                title="Close note"
+              >
+                <X size={18} />
+              </button>
+              <span className={`min-w-0 flex-1 truncate text-center text-xs font-bold ${saveState === "error" ? "text-rose-400" : "muted"}`}>
                 {saveState === "saving" ? "Saving..." : saveState === "error" ? "Save failed" : "Saved"}
               </span>
-              <button type="button" onClick={() => updateDraft({ pinned: !draft.pinned })} className="icon-button" aria-label={draft.pinned ? "Unpin note" : "Pin note"}>
+              <button
+                type="button"
+                onClick={() => updateDraft({ pinned: !draft.pinned })}
+                className="icon-button shrink-0"
+                aria-label={draft.pinned ? "Unpin note" : "Pin note"}
+                title={draft.pinned ? "Unpin note" : "Pin note"}
+              >
                 {draft.pinned ? <PinOff size={18} className="accent" /> : <Pin size={18} />}
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-5">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:p-5">
               <input
                 value={draft.title || ""}
                 onChange={(e) => updateDraft({ title: e.target.value })}
-                className="w-full bg-transparent text-xl font-black outline-none placeholder:muted"
+                className="w-full min-w-0 bg-transparent text-xl font-black outline-none placeholder:muted sm:text-2xl"
                 placeholder="Title"
               />
 
@@ -423,7 +446,7 @@ export default function NotesPage() {
                 <textarea
                   value={draft.content || ""}
                   onChange={(e) => updateDraft({ content: e.target.value })}
-                  className="mt-4 min-h-[280px] w-full resize-none bg-transparent text-sm leading-7 outline-none placeholder:muted"
+                  className="mt-4 min-h-[220px] w-full resize-none bg-transparent text-base leading-7 outline-none placeholder:muted sm:min-h-[280px] sm:text-sm"
                   placeholder="Take a note..."
                   autoFocus
                 />
@@ -454,9 +477,22 @@ export default function NotesPage() {
                     <button key={tag} type="button" onClick={() => updateDraft({ tags: draft.tags.filter((item) => item !== tag) })} className="rounded-full border px-3 py-1.5 text-xs font-bold" style={{ borderColor: "var(--line)" }}>#{tag} ×</button>
                   ))}
                 </div>
-                <div className="mt-3 flex gap-2">
-                  <input value={tagInput} onChange={(e) => setTagInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTag() } }} className="input min-w-0 flex-1" placeholder="Add tag" />
-                  <button type="button" onClick={addTag} className="btn btn-secondary">Add</button>
+                <div className="mt-3 flex min-w-0 gap-2">
+                  <input
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault()
+                        addTag()
+                      }
+                    }}
+                    className="input min-w-0 flex-1"
+                    placeholder="Add tag"
+                  />
+                  <button type="button" onClick={addTag} className="btn btn-secondary shrink-0 px-4">
+                    Add
+                  </button>
                 </div>
               </div>
 
@@ -480,11 +516,19 @@ export default function NotesPage() {
                   setEditing(null)
                   setDraft(null)
                 }}
-                className="btn btn-secondary"
+                className="btn btn-secondary min-w-0 flex-1 justify-center sm:flex-none"
               >
-                {draft.archived ? <ArchiveRestore size={16} /> : <Archive size={16} />} {draft.archived ? "Restore" : "Archive"}
+                {draft.archived ? <ArchiveRestore size={16} /> : <Archive size={16} />}
+                <span>{draft.archived ? "Restore" : "Archive"}</span>
               </button>
-              <button type="button" onClick={() => setDeleteTarget(draft)} className="btn btn-secondary text-rose-400"><Trash2 size={16} /> Delete</button>
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(draft)}
+                className="btn btn-secondary min-w-0 flex-1 justify-center text-rose-400 sm:flex-none"
+              >
+                <Trash2 size={16} />
+                <span>Delete</span>
+              </button>
             </div>
           </div>
         </div>
