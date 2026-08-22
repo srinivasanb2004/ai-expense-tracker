@@ -76,11 +76,11 @@ type Note = {
 
 const noteColors = [
   { key: "default", label: "Default", value: "var(--panel)" },
-  { key: "emerald", label: "Emerald", value: "rgba(16,185,129,.13)" },
-  { key: "teal", label: "Teal", value: "rgba(20,184,166,.13)" },
-  { key: "amber", label: "Amber", value: "rgba(245,158,11,.13)" },
-  { key: "rose", label: "Rose", value: "rgba(244,63,94,.11)" },
-  { key: "violet", label: "Violet", value: "rgba(139,92,246,.12)" },
+  { key: "emerald", label: "Emerald", value: "color-mix(in srgb, var(--panel) 87%, #10b981 13%)" },
+  { key: "teal", label: "Teal", value: "color-mix(in srgb, var(--panel) 87%, #14b8a6 13%)" },
+  { key: "amber", label: "Amber", value: "color-mix(in srgb, var(--panel) 87%, #f59e0b 13%)" },
+  { key: "rose", label: "Rose", value: "color-mix(in srgb, var(--panel) 89%, #f43f5e 11%)" },
+  { key: "violet", label: "Violet", value: "color-mix(in srgb, var(--panel) 88%, #8b5cf6 12%)" },
 ]
 
 function colorValue(key: string) {

@@ -631,8 +631,12 @@ html.light .network-banner-online {
   cursor:pointer;
 }
 .note-editor {
+  color:var(--text);
   box-shadow:0 30px 100px rgba(0,0,0,.46),0 0 34px rgba(52,211,153,.08);
   backdrop-filter:blur(24px);
+}
+.note-card {
+  color:var(--text);
 }
 html.light .note-card {
   box-shadow:0 14px 40px rgba(23,55,44,.09),inset 0 1px 0 rgba(255,255,255,.8);

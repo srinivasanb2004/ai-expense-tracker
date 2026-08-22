@@ -5,11 +5,14 @@ import Link from "next/link"
 import {
   Bell,
   Bot,
-  Plus,
   RefreshCw,
   BarChart3,
   ScanLine,
   Settings,
+  Moon,
+  Sun,
+  Calculator,
+  Copy,
 } from "lucide-react"
 
 import {
@@ -41,7 +44,22 @@ export default function Topbar() {
   const [refreshing, setRefreshing] =
     useState(false)
 
+  const [theme, setTheme] =
+    useState<"dark" | "light">("dark")
+
+  const [calculatorOpen, setCalculatorOpen] =
+    useState(false)
+
+  const [calculatorDisplay, setCalculatorDisplay] =
+    useState("0")
+
+  const [calculatorExpression, setCalculatorExpression] =
+    useState("")
+
   const box =
+    useRef<HTMLDivElement>(null)
+
+  const calculatorBox =
     useRef<HTMLDivElement>(null)
 
   async function loadNotifications() {
@@ -71,7 +89,46 @@ export default function Topbar() {
 
   useEffect(() => {
     loadNotifications()
+
+    const savedTheme =
+      (localStorage.getItem("theme") as
+        | "dark"
+        | "light") || "dark"
+
+    setTheme(savedTheme)
+
+    document.documentElement.classList.remove(
+      "dark",
+      "light"
+    )
+
+    document.documentElement.classList.add(
+      savedTheme
+    )
   }, [])
+
+  function toggleTheme() {
+    const newTheme =
+      theme === "dark"
+        ? "light"
+        : "dark"
+
+    setTheme(newTheme)
+
+    localStorage.setItem(
+      "theme",
+      newTheme
+    )
+
+    document.documentElement.classList.remove(
+      "dark",
+      "light"
+    )
+
+    document.documentElement.classList.add(
+      newTheme
+    )
+  }
 
   async function refreshNotifications() {
     if (refreshing) return
@@ -138,6 +195,33 @@ export default function Topbar() {
       )
   }, [])
 
+
+  useEffect(() => {
+    function closeCalculator(
+      event: MouseEvent
+    ) {
+      if (
+        calculatorBox.current &&
+        !calculatorBox.current.contains(
+          event.target as Node
+        )
+      ) {
+        setCalculatorOpen(false)
+      }
+    }
+
+    document.addEventListener(
+      "mousedown",
+      closeCalculator
+    )
+
+    return () =>
+      document.removeEventListener(
+        "mousedown",
+        closeCalculator
+      )
+  }, [])
+
   async function markAllRead() {
     await fetch(
       "/api/notifications",
@@ -180,6 +264,88 @@ export default function Topbar() {
     await loadNotifications()
   }
 
+
+  function appendCalculator(value: string) {
+    if (value === ".") {
+      const parts = calculatorExpression.split(/[+\-*/]/)
+      const currentPart = parts[parts.length - 1] || ""
+
+      if (currentPart.includes(".")) {
+        return
+      }
+    }
+
+    const next =
+      calculatorExpression === "0"
+        ? value
+        : `${calculatorExpression}${value}`
+
+    setCalculatorExpression(next)
+    setCalculatorDisplay(next || "0")
+  }
+
+  function clearCalculator() {
+    setCalculatorExpression("")
+    setCalculatorDisplay("0")
+  }
+
+  function backspaceCalculator() {
+    const next =
+      calculatorExpression.slice(0, -1)
+
+    setCalculatorExpression(next)
+    setCalculatorDisplay(next || "0")
+  }
+
+  function calculateResult() {
+    if (!calculatorExpression.trim()) {
+      return
+    }
+
+    try {
+      const safeExpression =
+        calculatorExpression.replace(/×/g, "*").replace(/÷/g, "/")
+
+      if (!/^[0-9+\-*/.()\s]+$/.test(safeExpression)) {
+        throw new Error("Invalid expression")
+      }
+
+      const result = Function(
+        `"use strict"; return (${safeExpression})`
+      )()
+
+      if (
+        typeof result !== "number" ||
+        !Number.isFinite(result)
+      ) {
+        throw new Error("Invalid result")
+      }
+
+      const rounded =
+        Math.round((result + Number.EPSILON) * 100000000) /
+        100000000
+
+      setCalculatorExpression(String(rounded))
+      setCalculatorDisplay(String(rounded))
+    } catch {
+      setCalculatorExpression("")
+      setCalculatorDisplay("Error")
+    }
+  }
+
+  async function copyCalculatorResult() {
+    try {
+      await navigator.clipboard.writeText(
+        calculatorDisplay
+      )
+    } catch (error) {
+      console.error(
+        "Could not copy calculator result:",
+        error
+      )
+    }
+  }
+
   return (
     <header
       className="sticky top-0 z-30 flex h-[72px] w-full min-w-0 items-center justify-between gap-1.5 border-b px-2.5 backdrop-blur-xl sm:gap-2 sm:px-3 md:h-20 md:px-8"
@@ -219,30 +385,203 @@ export default function Topbar() {
       </div>
 
       <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
-        {/* DESKTOP SCAN */}
+        {/* DESKTOP: LIGHT/DARK -> AI -> AI SCAN */}
+
+        <button
+          type="button"
+          onClick={toggleTheme}
+          aria-label={
+            theme === "dark"
+              ? "Switch to light mode"
+              : "Switch to dark mode"
+          }
+          title={
+            theme === "dark"
+              ? "Light mode"
+              : "Dark mode"
+          }
+          className="hidden h-11 w-11 shrink-0 cursor-pointer place-items-center rounded-xl border transition hover:-translate-y-0.5 md:grid"
+          style={{
+            borderColor: "var(--line)",
+            background: "var(--secondary)",
+            color: "var(--text)",
+          }}
+        >
+          {theme === "dark" ? (
+            <Sun size={19} />
+          ) : (
+            <Moon size={19} />
+          )}
+        </button>
+
+        {/* DESKTOP CALCULATOR */}
+
+        <div
+          ref={calculatorBox}
+          className="relative hidden md:block"
+        >
+          <button
+            type="button"
+            onClick={() =>
+              setCalculatorOpen(
+                (current) => !current
+              )
+            }
+            aria-label="Calculator"
+            title="Calculator"
+            className="grid h-11 w-11 shrink-0 cursor-pointer place-items-center rounded-xl border transition hover:-translate-y-0.5"
+            style={{
+              borderColor: "var(--line)",
+              background: "var(--secondary)",
+              color: "var(--text)",
+            }}
+          >
+            <Calculator size={19} />
+          </button>
+
+          {calculatorOpen && (
+            <div
+              className="absolute right-0 top-14 z-50 w-[250px] rounded-2xl border p-3 shadow-2xl"
+              style={{
+                borderColor: "var(--line)",
+                background: "var(--panel)",
+                color: "var(--text)",
+              }}
+            >
+              <div
+                className="rounded-xl border p-2.5"
+                style={{
+                  borderColor: "var(--line)",
+                  background: "var(--secondary)",
+                }}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs font-black uppercase tracking-[0.16em] muted">
+                    Calculator
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={copyCalculatorResult}
+                    className="grid h-8 w-8 place-items-center rounded-lg transition hover:bg-white/5"
+                    aria-label="Copy result"
+                    title="Copy result"
+                  >
+                    <Copy size={15} />
+                  </button>
+                </div>
+
+                <p className="mt-2 min-h-7 break-all text-right text-xl font-black">
+                  {calculatorDisplay}
+                </p>
+              </div>
+
+              <div className="mt-2.5 grid grid-cols-4 gap-1.5">
+                {[
+                  "7",
+                  "8",
+                  "9",
+                  "÷",
+                  "4",
+                  "5",
+                  "6",
+                  "×",
+                  "1",
+                  "2",
+                  "3",
+                  "-",
+                  "0",
+                  ".",
+                  "=",
+                  "+",
+                ].map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => {
+                      if (key === "=") {
+                        calculateResult()
+                      } else {
+                        appendCalculator(key)
+                      }
+                    }}
+                    className={`h-9 rounded-lg border text-xs font-black transition hover:-translate-y-0.5 ${
+                      ["+", "-", "×", "÷", "="].includes(
+                        key
+                      )
+                        ? "accent"
+                        : ""
+                    }`}
+                    style={{
+                      borderColor: "var(--line)",
+                      background: "var(--secondary)",
+                      color: ["+", "-", "×", "÷", "="].includes(
+                        key
+                      )
+                        ? "var(--accent)"
+                        : "var(--text)",
+                    }}
+                  >
+                    {key}
+                  </button>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={clearCalculator}
+                  className="col-span-2 h-9 rounded-lg border text-xs font-black text-rose-400 transition hover:-translate-y-0.5"
+                  style={{
+                    borderColor: "var(--line)",
+                    background: "var(--secondary)",
+                  }}
+                >
+                  Clear
+                </button>
+
+                <button
+                  type="button"
+                  onClick={backspaceCalculator}
+                  className="col-span-2 h-9 rounded-lg border text-xs font-black transition hover:-translate-y-0.5"
+                  style={{
+                    borderColor: "var(--line)",
+                    background: "var(--secondary)",
+                    color: "var(--text)",
+                  }}
+                >
+                  Backspace
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <Link
+          href="/assistant"
+          aria-label="WalletIQ AI Assistant"
+          title="WalletIQ AI Assistant"
+          className="hidden h-11 w-11 shrink-0 cursor-pointer place-items-center rounded-xl border transition hover:-translate-y-0.5 md:grid"
+          style={{
+            borderColor: "var(--line)",
+            background: "var(--secondary)",
+            color: "var(--text)",
+          }}
+        >
+          <Bot size={19} />
+        </Link>
 
         <Link
           href="/scan"
-          aria-label="Scan receipt"
+          aria-label="AI Scan receipt"
+          title="AI Scan"
           className="hidden h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-xl border px-4 transition hover:-translate-y-0.5 md:flex"
           style={{
-            borderColor:
-              "var(--line)",
-
-            background:
-              "var(--secondary)",
-
-            color:
-              "var(--text)",
+            borderColor: "var(--line)",
+            background: "var(--secondary)",
+            color: "var(--text)",
           }}
         >
-          <ScanLine
-            size={18}
-          />
-
-          <span>
-            Scan
-          </span>
+          <ScanLine size={18} />
+          <span>AI Scan</span>
         </Link>
 
         {/* MOBILE AI - 1ST */}
@@ -464,7 +803,7 @@ export default function Topbar() {
         <Link
           href="/settings"
           aria-label="Settings"
-          className="grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-xl border transition hover:-translate-y-0.5 sm:h-11 sm:w-11 md:hidden"
+          className="grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-xl border transition hover:-translate-y-0.5 sm:h-11 sm:w-11 md:h-11 md:w-11"
           style={{
             borderColor:
               "var(--line)",
@@ -481,25 +820,7 @@ export default function Topbar() {
           />
         </Link>
 
-        {/* DESKTOP ADD EXPENSE */}
 
-        <Link
-          href="/expenses?new=1"
-          className="hidden h-11 shrink-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 text-sm font-bold transition hover:-translate-y-0.5 md:flex"
-          style={{
-            background:
-              "linear-gradient(135deg,#6ee7b7,#22c55e)",
-
-            color:
-              "#052018",
-          }}
-        >
-          <Plus
-            size={17}
-          />
-
-          Add expense
-        </Link>
       </div>
     </header>
   )
