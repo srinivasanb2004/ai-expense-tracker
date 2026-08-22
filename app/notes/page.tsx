@@ -7,6 +7,7 @@ import Toast, { ToastState } from "@/components/toast"
 import {
   Archive,
   ArchiveRestore,
+  Bot,
   Check,
   CheckSquare2,
   Palette,
@@ -15,6 +16,7 @@ import {
   Plus,
   Search,
   StickyNote,
+  Sparkles,
   Tags,
   Trash2,
   X,
@@ -26,6 +28,20 @@ type NoteItem = {
   text: string
   checked: boolean
   position?: number
+}
+
+
+type AiSuggestion = {
+  id: string
+  type: "RECURRING" | "BUDGET" | "BORROW_LEND"
+  title: string
+  confidence: "high" | "medium"
+  fields: Record<string, unknown>
+}
+
+type AiAnalysis = {
+  summary: string
+  suggestions: AiSuggestion[]
 }
 
 type Note = {
@@ -72,6 +88,9 @@ export default function NotesPage() {
   const [tagInput, setTagInput] = useState("")
   const [deleteTarget, setDeleteTarget] = useState<Note | null>(null)
   const [toast, setToast] = useState<ToastState>(null)
+  const [aiAnalysis, setAiAnalysis] = useState<AiAnalysis | null>(null)
+  const [analyzing, setAnalyzing] = useState(false)
+  const [aiError, setAiError] = useState("")
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const firstDraftRender = useRef(true)
 
@@ -121,6 +140,8 @@ export default function NotesPage() {
     setDraft({ ...note, items: note.items.map((item) => ({ ...item })) })
     setTagInput("")
     setSaveState("saved")
+    setAiAnalysis(null)
+    setAiError("")
   }
 
   async function persist(note: Note) {
@@ -275,6 +296,74 @@ export default function NotesPage() {
     if (!tag || draft.tags.includes(tag)) return setTagInput("")
     updateDraft({ tags: [...draft.tags, tag].slice(0, 8) })
     setTagInput("")
+  }
+
+  async function analyzeNote() {
+    if (!draft || analyzing) return
+
+    const hasContent =
+      Boolean(draft.title?.trim()) ||
+      Boolean(draft.content?.trim()) ||
+      draft.items.some((item) => item.text.trim())
+
+    if (!hasContent) {
+      setAiError("Add some note content before analyzing it.")
+      return
+    }
+
+    setAnalyzing(true)
+    setAiError("")
+    setAiAnalysis(null)
+
+    try {
+      const response = await fetch("/api/notes/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: draft.title || "",
+          content: draft.content || "",
+          items: draft.items.map((item) => ({
+            text: item.text,
+            checked: item.checked,
+          })),
+        }),
+      })
+
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(data.error || "Could not analyze this note.")
+      }
+
+      setAiAnalysis({
+        summary: String(data.summary || "Analysis complete."),
+        suggestions: Array.isArray(data.suggestions) ? data.suggestions : [],
+      })
+    } catch (error) {
+      setAiError(
+        error instanceof Error ? error.message : "Could not analyze this note."
+      )
+    } finally {
+      setAnalyzing(false)
+    }
+  }
+
+  function suggestionLabel(type: AiSuggestion["type"]) {
+    if (type === "RECURRING") return "Recurring payment"
+    if (type === "BUDGET") return "Budget"
+    return "Borrow / Lend"
+  }
+
+  function suggestionIcon(type: AiSuggestion["type"]) {
+    if (type === "RECURRING") return "🔁"
+    if (type === "BUDGET") return "💰"
+    return "🤝"
+  }
+
+  function displayField(value: unknown) {
+    if (value === null || value === undefined || value === "") return "Not specified"
+    if (typeof value === "number") return `₹${value.toLocaleString("en-IN")}`
+    return String(value)
   }
 
   return (
@@ -469,6 +558,85 @@ export default function NotesPage() {
                   <button type="button" onClick={addChecklistItem} className="btn btn-secondary mt-2"><Plus size={15} /> List item</button>
                 </div>
               )}
+
+              <div className="mt-7 border-t pt-5" style={{ borderColor: "var(--line)" }}>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <Sparkles size={16} className="accent" />
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-wider muted">WalletIQ AI</p>
+                      <p className="mt-1 text-xs muted">Detect financial actions in this note.</p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={analyzeNote}
+                    disabled={analyzing}
+                    className="btn btn-primary shrink-0 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {analyzing ? <Bot size={16} className="animate-pulse" /> : <Sparkles size={16} />}
+                    {analyzing ? "Analyzing..." : "Analyze with AI"}
+                  </button>
+                </div>
+
+                {aiError && (
+                  <div className="mt-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs font-bold text-rose-300">
+                    {aiError}
+                  </div>
+                )}
+
+                {aiAnalysis && (
+                  <div className="mt-4 space-y-3">
+                    <div className="rounded-2xl border p-3" style={{ borderColor: "var(--line)", background: "var(--secondary)" }}>
+                      <p className="text-sm font-bold">{aiAnalysis.summary}</p>
+                    </div>
+
+                    {aiAnalysis.suggestions.length === 0 ? (
+                      <div className="rounded-2xl border p-4 text-sm muted" style={{ borderColor: "var(--line)" }}>
+                        No recurring payment, budget, or borrow/lend action was clearly detected.
+                      </div>
+                    ) : (
+                      aiAnalysis.suggestions.map((suggestion) => (
+                        <div
+                          key={suggestion.id}
+                          className="rounded-2xl border p-4"
+                          style={{ borderColor: "var(--line)", background: "var(--secondary)" }}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-xs font-black uppercase tracking-wider accent">
+                                {suggestionIcon(suggestion.type)} {suggestionLabel(suggestion.type)}
+                              </p>
+                              <p className="mt-1 font-black">{suggestion.title}</p>
+                            </div>
+                            <span className="rounded-full border px-2 py-1 text-[10px] font-bold muted" style={{ borderColor: "var(--line)" }}>
+                              {suggestion.confidence} confidence
+                            </span>
+                          </div>
+
+                          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                            {Object.entries(suggestion.fields)
+                              .filter(([, value]) => value !== null && value !== undefined && value !== "")
+                              .map(([key, value]) => (
+                                <div key={key} className="rounded-xl border px-3 py-2" style={{ borderColor: "var(--line)" }}>
+                                  <p className="text-[10px] font-black uppercase tracking-wider muted">
+                                    {key.replace(/([A-Z])/g, " $1").replace(/^./, (letter) => letter.toUpperCase())}
+                                  </p>
+                                  <p className="mt-1 break-words text-sm font-bold">{displayField(value)}</p>
+                                </div>
+                              ))}
+                          </div>
+
+                          <p className="mt-3 text-[11px] muted">
+                            Preview only — Phase 2 Step 1 does not create or change any financial record.
+                          </p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
 
               <div className="mt-7 border-t pt-5" style={{ borderColor: "var(--line)" }}>
                 <div className="flex items-center gap-2"><Tags size={16} className="accent" /><p className="text-xs font-black uppercase tracking-wider muted">Tags</p></div>
