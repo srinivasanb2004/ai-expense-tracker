@@ -44,6 +44,22 @@ type AiAnalysis = {
   suggestions: AiSuggestion[]
 }
 
+type ActionForm = Record<string, string>
+
+const financeCategories = [
+  "Food",
+  "Transport",
+  "Shopping",
+  "Bills",
+  "Health",
+  "Entertainment",
+  "Education",
+  "Other",
+]
+
+const paymentMethods = ["UPI", "Card", "Cash", "Bank Transfer", "Other"]
+const recurringFrequencies = ["Weekly", "Monthly", "Yearly"]
+
 type Note = {
   id: string
   title?: string | null
@@ -75,6 +91,52 @@ function emptyNote(note: Note) {
   return !note.title?.trim() && !note.content?.trim() && !note.items.some((item) => item.text.trim())
 }
 
+function ActionDateField({
+  value,
+  placeholder,
+  onChange,
+  max,
+}: {
+  value: string
+  placeholder: string
+  onChange: (value: string) => void
+  max?: string
+}) {
+  const [focused, setFocused] = useState(false)
+  const showDate = focused || Boolean(value)
+
+  return (
+    <input
+      type={showDate ? "date" : "text"}
+      value={value}
+      placeholder={placeholder}
+      readOnly={!showDate}
+      max={showDate ? max : undefined}
+      onFocus={(event) => {
+        setFocused(true)
+        requestAnimationFrame(() => {
+          try {
+            event.currentTarget.showPicker?.()
+          } catch {}
+        })
+      }}
+      onClick={(event) => {
+        setFocused(true)
+        requestAnimationFrame(() => {
+          try {
+            event.currentTarget.showPicker?.()
+          } catch {}
+        })
+      }}
+      onBlur={() => {
+        if (!value) setFocused(false)
+      }}
+      onChange={(event) => onChange(event.target.value)}
+      className="input w-full"
+    />
+  )
+}
+
 export default function NotesPage() {
   const [notes, setNotes] = useState<Note[]>([])
   const [query, setQuery] = useState("")
@@ -91,6 +153,11 @@ export default function NotesPage() {
   const [aiAnalysis, setAiAnalysis] = useState<AiAnalysis | null>(null)
   const [analyzing, setAnalyzing] = useState(false)
   const [aiError, setAiError] = useState("")
+  const [actionSuggestion, setActionSuggestion] = useState<AiSuggestion | null>(null)
+  const [actionForm, setActionForm] = useState<ActionForm>({})
+  const [creatingAction, setCreatingAction] = useState(false)
+  const [actionError, setActionError] = useState("")
+  const [createdSuggestionIds, setCreatedSuggestionIds] = useState<string[]>([])
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const firstDraftRender = useRef(true)
 
@@ -142,6 +209,10 @@ export default function NotesPage() {
     setSaveState("saved")
     setAiAnalysis(null)
     setAiError("")
+    setActionSuggestion(null)
+    setActionForm({})
+    setActionError("")
+    setCreatedSuggestionIds([])
   }
 
   async function persist(note: Note) {
@@ -364,6 +435,148 @@ export default function NotesPage() {
     if (value === null || value === undefined || value === "") return "Not specified"
     if (typeof value === "number") return `₹${value.toLocaleString("en-IN")}`
     return String(value)
+  }
+
+  function fieldString(value: unknown) {
+    return value === null || value === undefined ? "" : String(value)
+  }
+
+  function indiaTodayInput() {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(new Date())
+
+    const year = parts.find((part) => part.type === "year")?.value || ""
+    const month = parts.find((part) => part.type === "month")?.value || ""
+    const day = parts.find((part) => part.type === "day")?.value || ""
+    return `${year}-${month}-${day}`
+  }
+
+  function openActionReview(suggestion: AiSuggestion) {
+    const fields = suggestion.fields || {}
+    setActionSuggestion(suggestion)
+    setActionError("")
+
+    if (suggestion.type === "RECURRING") {
+      setActionForm({
+        merchant: fieldString(fields.merchant),
+        amount: fieldString(fields.amount),
+        category: financeCategories.includes(fieldString(fields.category)) ? fieldString(fields.category) : "Other",
+        paymentMethod: paymentMethods.includes(fieldString(fields.paymentMethod)) ? fieldString(fields.paymentMethod) : "Other",
+        frequency: recurringFrequencies.includes(fieldString(fields.frequency)) ? fieldString(fields.frequency) : "",
+        nextDate: fieldString(fields.nextDate),
+      })
+      return
+    }
+
+    if (suggestion.type === "BUDGET") {
+      setActionForm({
+        category: financeCategories.includes(fieldString(fields.category)) ? fieldString(fields.category) : "Other",
+        amount: fieldString(fields.amount),
+      })
+      return
+    }
+
+    setActionForm({
+      person: fieldString(fields.person),
+      type: ["BORROWED", "LENT"].includes(fieldString(fields.type)) ? fieldString(fields.type) : "",
+      amount: fieldString(fields.amount),
+      startDate: fieldString(fields.startDate),
+      dueDate: fieldString(fields.dueDate),
+      phone: fieldString(fields.phone),
+      notes: fieldString(fields.notes),
+    })
+  }
+
+  function updateActionField(name: string, value: string) {
+    setActionForm((current) => ({ ...current, [name]: value }))
+  }
+
+  async function createSuggestedAction() {
+    if (!actionSuggestion || creatingAction) return
+
+    setCreatingAction(true)
+    setActionError("")
+
+    try {
+      let url = ""
+      let payload: Record<string, unknown> = {}
+
+      if (actionSuggestion.type === "RECURRING") {
+        const amount = Number(actionForm.amount)
+        if (!actionForm.merchant || !Number.isFinite(amount) || amount <= 0 || !actionForm.frequency || !actionForm.nextDate) {
+          throw new Error("Complete merchant, amount, frequency and next due date before creating the recurring payment.")
+        }
+
+        url = "/api/recurring"
+        payload = {
+          merchant: actionForm.merchant.trim(),
+          amount,
+          category: actionForm.category || "Other",
+          paymentMethod: actionForm.paymentMethod || "Other",
+          frequency: actionForm.frequency,
+          nextDate: actionForm.nextDate,
+          active: true,
+        }
+      } else if (actionSuggestion.type === "BUDGET") {
+        const amount = Number(actionForm.amount)
+        if (!actionForm.category || !Number.isFinite(amount) || amount <= 0) {
+          throw new Error("Choose a budget category and enter a valid amount.")
+        }
+
+        url = "/api/budgets"
+        payload = {
+          category: actionForm.category,
+          amount,
+        }
+      } else {
+        const amount = Number(actionForm.amount)
+        if (!actionForm.person || !["BORROWED", "LENT"].includes(actionForm.type) || !Number.isFinite(amount) || amount <= 0 || !actionForm.startDate) {
+          throw new Error("Complete person, type, amount and start date before creating the Borrow/Lend record.")
+        }
+
+        if (actionForm.dueDate && actionForm.dueDate < actionForm.startDate) {
+          throw new Error("Due date cannot be before the start date.")
+        }
+
+        url = "/api/borrow-lend"
+        payload = {
+          person: actionForm.person.trim(),
+          type: actionForm.type,
+          amount,
+          startDate: actionForm.startDate,
+          dueDate: actionForm.dueDate || null,
+          phone: actionForm.phone?.trim() || null,
+          notes: actionForm.notes?.trim() || null,
+        }
+      }
+
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(data.error || "Could not create this WalletIQ record.")
+      }
+
+      setCreatedSuggestionIds((current) =>
+        current.includes(actionSuggestion.id) ? current : [...current, actionSuggestion.id]
+      )
+      const label = suggestionLabel(actionSuggestion.type)
+      setActionSuggestion(null)
+      setActionForm({})
+      say(`${label} added successfully.`)
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Could not create this WalletIQ record.")
+    } finally {
+      setCreatingAction(false)
+    }
   }
 
   return (
@@ -628,9 +841,25 @@ export default function NotesPage() {
                               ))}
                           </div>
 
-                          <p className="mt-3 text-[11px] muted">
-                            Preview only — Phase 2 Step 1 does not create or change any financial record.
-                          </p>
+                          <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-[11px] muted">
+                              Review the detected details before adding anything to WalletIQ.
+                            </p>
+
+                            {createdSuggestionIds.includes(suggestion.id) ? (
+                              <span className="rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-xs font-black text-emerald-300">
+                                ✓ Added
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => openActionReview(suggestion)}
+                                className="btn btn-primary"
+                              >
+                                Review & create
+                              </button>
+                            )}
+                          </div>
                         </div>
                       ))
                     )}
@@ -696,6 +925,115 @@ export default function NotesPage() {
               >
                 <Trash2 size={16} />
                 <span>Delete</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {actionSuggestion && (
+        <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/70 p-3 backdrop-blur-sm sm:p-4">
+          <div
+            className="w-full max-w-lg overflow-hidden rounded-[26px] border shadow-2xl"
+            style={{ background: "var(--panel)", borderColor: "var(--line)" }}
+          >
+            <div className="flex items-center justify-between gap-3 border-b px-4 py-3" style={{ borderColor: "var(--line)" }}>
+              <div className="min-w-0">
+                <p className="text-xs font-black uppercase tracking-wider accent">
+                  {suggestionIcon(actionSuggestion.type)} {suggestionLabel(actionSuggestion.type)}
+                </p>
+                <h3 className="mt-1 truncate text-lg font-black">Review before creating</h3>
+              </div>
+              <button
+                type="button"
+                className="icon-button shrink-0"
+                onClick={() => {
+                  if (!creatingAction) {
+                    setActionSuggestion(null)
+                    setActionError("")
+                  }
+                }}
+                aria-label="Close review"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="max-h-[70vh] overflow-y-auto p-4">
+              {actionSuggestion.type === "RECURRING" && (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <input className="input sm:col-span-2" value={actionForm.merchant || ""} onChange={(e) => updateActionField("merchant", e.target.value)} placeholder="Merchant" />
+                  <input className="input" type="number" min="0.01" step="0.01" value={actionForm.amount || ""} onChange={(e) => updateActionField("amount", e.target.value)} placeholder="Amount ₹" />
+                  <select className="input" value={actionForm.category || "Other"} onChange={(e) => updateActionField("category", e.target.value)}>
+                    {financeCategories.map((category) => <option key={category} value={category}>{category}</option>)}
+                  </select>
+                  <select className="input" value={actionForm.paymentMethod || "Other"} onChange={(e) => updateActionField("paymentMethod", e.target.value)}>
+                    {paymentMethods.map((method) => <option key={method} value={method}>{method}</option>)}
+                  </select>
+                  <select className="input" value={actionForm.frequency || ""} onChange={(e) => updateActionField("frequency", e.target.value)}>
+                    <option value="">Frequency</option>
+                    {recurringFrequencies.map((frequency) => <option key={frequency} value={frequency}>{frequency}</option>)}
+                  </select>
+                  <div className="sm:col-span-2">
+                    <ActionDateField
+                      value={actionForm.nextDate || ""}
+                      placeholder="Next due date"
+                      onChange={(value) => updateActionField("nextDate", value)}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {actionSuggestion.type === "BUDGET" && (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <select className="input" value={actionForm.category || "Other"} onChange={(e) => updateActionField("category", e.target.value)}>
+                    {financeCategories.map((category) => <option key={category} value={category}>{category}</option>)}
+                  </select>
+                  <input className="input" type="number" min="1" step="0.01" value={actionForm.amount || ""} onChange={(e) => updateActionField("amount", e.target.value)} placeholder="Monthly budget ₹" />
+                  <p className="sm:col-span-2 rounded-xl border p-3 text-xs muted" style={{ borderColor: "var(--line)" }}>
+                    WalletIQ will save this budget for the current month.
+                  </p>
+                </div>
+              )}
+
+              {actionSuggestion.type === "BORROW_LEND" && (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <input className="input sm:col-span-2" value={actionForm.person || ""} onChange={(e) => updateActionField("person", e.target.value)} placeholder="Friend / person name" />
+                  <select className="input" value={actionForm.type || ""} onChange={(e) => updateActionField("type", e.target.value)}>
+                    <option value="">Borrow or lend?</option>
+                    <option value="BORROWED">I borrowed money</option>
+                    <option value="LENT">I lent money</option>
+                  </select>
+                  <input className="input" type="number" min="0.01" step="0.01" value={actionForm.amount || ""} onChange={(e) => updateActionField("amount", e.target.value)} placeholder="Amount ₹" />
+                  <ActionDateField
+                    value={actionForm.startDate || ""}
+                    placeholder="Start date"
+                    max={indiaTodayInput()}
+                    onChange={(value) => updateActionField("startDate", value)}
+                  />
+                  <ActionDateField
+                    value={actionForm.dueDate || ""}
+                    placeholder="Due date"
+                    onChange={(value) => updateActionField("dueDate", value)}
+                  />
+                  <input className="input sm:col-span-2" value={actionForm.phone || ""} onChange={(e) => updateActionField("phone", e.target.value)} placeholder="Phone / contact (optional)" />
+                  <input className="input sm:col-span-2" value={actionForm.notes || ""} onChange={(e) => updateActionField("notes", e.target.value)} placeholder="Notes (optional)" />
+                </div>
+              )}
+
+              {actionError && (
+                <div className="mt-4 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm font-bold text-rose-300">
+                  {actionError}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 border-t p-4" style={{ borderColor: "var(--line)" }}>
+              <button type="button" className="btn btn-secondary" disabled={creatingAction} onClick={() => { setActionSuggestion(null); setActionError("") }}>
+                Cancel
+              </button>
+              <button type="button" className="btn btn-primary" disabled={creatingAction} onClick={createSuggestedAction}>
+                {creatingAction ? "Creating..." : `Create ${suggestionLabel(actionSuggestion.type)}`}
               </button>
             </div>
           </div>
