@@ -10,7 +10,7 @@ export async function POST(req: Request) {
 
     const apiKey = process.env.GEMINI_API_KEY
     const model = process.env.GEMINI_MODEL || "gemini-2.5-flash"
-    if (!apiKey) return NextResponse.json({ error: "GEMINI_API_KEY is not configured" }, { status: 503 })
+    if (!apiKey) return NextResponse.json({ error: "WalletIQ AI is not configured" }, { status: 503 })
 
     const body = await req.json()
     const question = String(body.question || "").trim()
@@ -32,13 +32,13 @@ export async function POST(req: Request) {
 
     const payload = await response.json().catch(() => null)
     if (!response.ok) {
-      return NextResponse.json({ error: payload?.error?.message || `Gemini request failed (${response.status}).` }, { status: response.status })
+      return NextResponse.json({ error: payload?.error?.message || `WalletIQ AI request failed (${response.status}).` }, { status: response.status })
     }
 
     const answer = payload?.candidates?.[0]?.content?.parts?.map((part: any) => part.text || "").join("") || "I couldn't generate an answer."
     return NextResponse.json({ answer })
   } catch (error: any) {
     console.error("Gemini AI error:", error)
-    return NextResponse.json({ error: error?.message || "Something went wrong while contacting Gemini." }, { status: 500 })
+    return NextResponse.json({ error: error?.message || "Something went wrong while contacting WalletIQ AI." }, { status: 500 })
   }
 }

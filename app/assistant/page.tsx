@@ -47,7 +47,7 @@ export default function Assistant() {
     <AppShell>
       <div className="flex items-center gap-3">
         <div className="grid h-12 w-12 place-items-center rounded-2xl bg-emerald-300 text-emerald-950"><Bot /></div>
-        <div><p className="eyebrow">Gemini powered</p><h2 className="mt-1 text-3xl font-black">AI Assistant</h2><p className="muted">Ask questions about your money.</p></div>
+        <div><p className="eyebrow">WalletIQ AI</p><h2 className="mt-1 text-3xl font-black">AI Assistant</h2><p className="muted">Ask WalletIQ AI questions about your money.</p></div>
       </div>
 
       {connectionError && <DataErrorState title="AI Assistant is unavailable" message="Check your internet connection and try your question again." onRetry={()=>setConnectionError(false)} />}

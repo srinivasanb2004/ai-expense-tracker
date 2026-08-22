@@ -1,6 +1,10 @@
 import { WalletCards, Sparkles } from "lucide-react"
 
-export default function Logo() {
+type LogoProps = {
+  subtitle?: string
+}
+
+export default function Logo({ subtitle = "Powered by AI ✦" }: LogoProps) {
   return (
     <div className="flex min-w-0 items-center gap-2 sm:gap-2.5">
       <div className="brand-mark relative shrink-0">
@@ -17,8 +21,8 @@ export default function Logo() {
           WalletIQ
         </p>
 
-        <p className="truncate whitespace-nowrap text-[8px] font-bold uppercase tracking-[0.16em] accent sm:text-[10px] sm:tracking-[0.2em]">
-          AI Tracker
+        <p className="truncate whitespace-nowrap text-[8px] font-bold uppercase tracking-[0.14em] accent sm:text-[10px] sm:tracking-[0.18em]">
+          {subtitle}
         </p>
       </div>
     </div>

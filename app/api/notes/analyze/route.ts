@@ -52,7 +52,7 @@ function extractJson(text: string) {
   const last = cleaned.lastIndexOf("}")
 
   if (first === -1 || last === -1 || last < first) {
-    throw new Error("Gemini did not return valid note analysis JSON.")
+    throw new Error("WalletIQ AI could not understand the note analysis response.")
   }
 
   return JSON.parse(cleaned.slice(first, last + 1))
@@ -78,7 +78,7 @@ export async function POST(req: Request) {
 
     if (!apiKey) {
       return NextResponse.json(
-        { error: "GEMINI_API_KEY is not configured" },
+        { error: "WalletIQ AI is not configured" },
         { status: 503 }
       )
     }
@@ -143,7 +143,7 @@ export async function POST(req: Request) {
 
     if (!response.ok) {
       const message =
-        payload?.error?.message || `Gemini request failed (${response.status}).`
+        payload?.error?.message || `WalletIQ AI request failed (${response.status}).`
       return NextResponse.json({ error: message }, { status: response.status })
     }
 

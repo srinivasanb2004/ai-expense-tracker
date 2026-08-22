@@ -12,7 +12,7 @@ export default function Home() {
   return (
     <main className="min-h-screen">
       <nav className="mx-auto flex max-w-7xl items-center justify-between gap-3 p-5 sm:p-6">
-        <Logo />
+        <Logo subtitle="Powered by AI ✦" />
 
         <div className="flex gap-2">
           {/* Always open Login */}
@@ -37,8 +37,9 @@ export default function Home() {
 
       <section className="mx-auto grid max-w-7xl gap-10 px-6 py-16 lg:grid-cols-2 lg:items-center lg:py-24">
         <div>
-          <div className="mb-5 inline-flex rounded-full border border-emerald-300/20 bg-emerald-300/10 px-4 py-2 text-sm accent">
-            AI-powered personal finance
+          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-300/10 px-4 py-2 text-sm font-bold accent">
+            <span aria-hidden="true">✨</span>
+            Powered by WalletIQ AI
           </div>
 
           <h1 className="text-5xl font-black leading-[1.05] md:text-7xl">
@@ -49,9 +50,9 @@ export default function Home() {
           </h1>
 
           <p className="mt-6 max-w-xl text-lg muted">
-            Track expenses, scan receipts with Gemini,
-            understand spending patterns and get useful
-            AI guidance from one private dashboard.
+            Track expenses, scan receipts with WalletIQ AI,
+            understand spending patterns, analyze finance notes
+            and get useful AI guidance from one private dashboard.
           </p>
 
           <div className="mt-8 flex flex-wrap gap-3">
@@ -84,7 +85,7 @@ export default function Home() {
               ],
               [
                 ScanLine,
-                "Gemini OCR",
+                "WalletIQ AI Scan",
                 "Turn receipts into editable expenses",
               ],
               [

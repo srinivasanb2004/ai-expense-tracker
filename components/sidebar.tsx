@@ -56,7 +56,7 @@ export default function Sidebar() {
       {/* Desktop sidebar */}
       <aside className="sidebar-surface fixed inset-y-0 left-0 z-40 hidden w-72 flex-col border-r p-5 md:flex">
         <div className="px-2 py-2">
-          <Logo />
+          <Logo subtitle="Powered by AI ✦" />
         </div>
 
         <nav className="mt-8 flex-1 space-y-1 overflow-y-auto">

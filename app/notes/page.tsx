@@ -778,7 +778,7 @@ export default function NotesPage() {
                     <Sparkles size={16} className="accent" />
                     <div>
                       <p className="text-xs font-black uppercase tracking-wider muted">WalletIQ AI</p>
-                      <p className="mt-1 text-xs muted">Detect financial actions in this note.</p>
+                      <p className="mt-1 text-xs muted">Detect financial actions in this note, then review before creating anything.</p>
                     </div>
                   </div>
 
@@ -789,7 +789,7 @@ export default function NotesPage() {
                     className="btn btn-primary shrink-0 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {analyzing ? <Bot size={16} className="animate-pulse" /> : <Sparkles size={16} />}
-                    {analyzing ? "Analyzing..." : "Analyze with AI"}
+                    {analyzing ? "Analyzing..." : "Analyze with WalletIQ AI"}
                   </button>
                 </div>
 
@@ -807,7 +807,7 @@ export default function NotesPage() {
 
                     {aiAnalysis.suggestions.length === 0 ? (
                       <div className="rounded-2xl border p-4 text-sm muted" style={{ borderColor: "var(--line)" }}>
-                        No recurring payment, budget, or borrow/lend action was clearly detected.
+                        WalletIQ AI did not clearly detect a recurring payment, budget, or Borrow/Lend action in this note.
                       </div>
                     ) : (
                       aiAnalysis.suggestions.map((suggestion) => (
@@ -843,12 +843,12 @@ export default function NotesPage() {
 
                           <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
                             <p className="text-[11px] muted">
-                              Review the detected details before adding anything to WalletIQ.
+                              Review and edit WalletIQ AI’s detected details before creating anything.
                             </p>
 
                             {createdSuggestionIds.includes(suggestion.id) ? (
-                              <span className="rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-xs font-black text-emerald-300">
-                                ✓ Added
+                              <span className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-xs font-black text-emerald-300">
+                                <Check size={14} strokeWidth={3} /> Added to WalletIQ
                               </span>
                             ) : (
                               <button

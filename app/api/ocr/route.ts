@@ -55,7 +55,7 @@ function extractJson(
     last === -1
   ) {
     throw new Error(
-      "Gemini did not return receipt JSON."
+      "WalletIQ AI did not return receipt data."
     )
   }
 
@@ -142,7 +142,7 @@ export async function POST(
       return NextResponse.json(
         {
           error:
-            "GEMINI_API_KEY is not configured",
+            "WalletIQ AI is not configured",
         },
         {
           status: 503,
@@ -292,7 +292,7 @@ export async function POST(
       const message =
         payload?.error
           ?.message ||
-        `Gemini request failed (${geminiResponse.status}).`
+        `WalletIQ AI request failed (${geminiResponse.status}).`
 
       console.error(
         "Gemini API error:",
@@ -336,7 +336,7 @@ export async function POST(
       return NextResponse.json(
         {
           error:
-            "Gemini could not read this receipt. Please try a clearer photo.",
+            "WalletIQ AI could not read this receipt. Please try a clearer photo.",
         },
         {
           status: 422,

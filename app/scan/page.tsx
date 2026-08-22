@@ -395,7 +395,7 @@ export default function Scan() {
       }
 
       setStatus(
-        "Gemini is reading your receipt..."
+        "WalletIQ AI is reading your receipt..."
       )
 
       const formData =
@@ -533,7 +533,7 @@ export default function Scan() {
 
       setValidationError(
         invalid
-          ? "Gemini could not confidently read the merchant or total. Please correct the highlighted fields before saving."
+          ? "WalletIQ AI could not confidently read the merchant or total. Please correct the highlighted fields before saving."
           : ""
       )
 
@@ -819,7 +819,7 @@ export default function Scan() {
 
       <div>
         <p className="eyebrow">
-          Gemini Vision
+          WalletIQ AI Vision
         </p>
 
         <h2 className="mt-2 text-3xl font-black">
@@ -917,8 +917,8 @@ export default function Scan() {
             />
 
             {scanning
-              ? "Scanning with Gemini..."
-              : "Extract receipt with Gemini"}
+              ? "Scanning with WalletIQ AI..."
+              : "Extract with WalletIQ AI"}
           </button>
 
           {status && (
@@ -974,7 +974,7 @@ export default function Scan() {
               </p>
 
               <p className="mt-2 text-sm muted">
-                Gemini results
+                WalletIQ AI results
                 will appear here
                 for you to review
                 before saving.

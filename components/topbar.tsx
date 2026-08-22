@@ -197,7 +197,7 @@ export default function Topbar() {
       {/* MOBILE LOGO */}
 
       <div className="min-w-0 flex-1 overflow-hidden md:hidden">
-        <Logo />
+        <Logo subtitle="WalletIQ AI ✦" />
       </div>
 
       {/* DESKTOP TITLE */}
@@ -210,7 +210,7 @@ export default function Topbar() {
               "var(--muted)",
           }}
         >
-          Finance workspace
+          WalletIQ AI • Finance workspace
         </p>
 
         <h1 className="mt-1 text-xl font-black">
