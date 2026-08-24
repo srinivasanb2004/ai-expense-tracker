@@ -83,8 +83,45 @@ const noteColors = [
   { key: "violet", label: "Violet", value: "color-mix(in srgb, var(--panel) 88%, #8b5cf6 12%)" },
 ]
 
+const noteThemes = [
+  {
+    key: "theme-aurora",
+    label: "Aurora",
+    value:
+      "radial-gradient(circle at 15% 15%, color-mix(in srgb, #10b981 24%, transparent) 0, transparent 38%), radial-gradient(circle at 85% 20%, color-mix(in srgb, #8b5cf6 20%, transparent) 0, transparent 42%), linear-gradient(135deg, color-mix(in srgb, var(--panel) 92%, #10b981 8%), color-mix(in srgb, var(--panel) 92%, #8b5cf6 8%))",
+  },
+  {
+    key: "theme-finance",
+    label: "Finance Grid",
+    value:
+      "linear-gradient(color-mix(in srgb, var(--text) 6%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--text) 6%, transparent) 1px, transparent 1px), linear-gradient(135deg, color-mix(in srgb, var(--panel) 94%, #10b981 6%), var(--panel))",
+  },
+  {
+    key: "theme-paper",
+    label: "Paper",
+    value:
+      "repeating-linear-gradient(to bottom, transparent 0 25px, color-mix(in srgb, var(--text) 8%, transparent) 26px, transparent 27px), linear-gradient(135deg, color-mix(in srgb, var(--panel) 96%, #f59e0b 4%), var(--panel))",
+  },
+  {
+    key: "theme-waves",
+    label: "Waves",
+    value:
+      "radial-gradient(ellipse at 0% 100%, color-mix(in srgb, #14b8a6 18%, transparent) 0 32%, transparent 33%), radial-gradient(ellipse at 35% 110%, color-mix(in srgb, #38bdf8 14%, transparent) 0 34%, transparent 35%), linear-gradient(145deg, color-mix(in srgb, var(--panel) 94%, #14b8a6 6%), var(--panel))",
+  },
+  {
+    key: "theme-midnight",
+    label: "Midnight",
+    value:
+      "radial-gradient(circle at 80% 15%, color-mix(in srgb, #8b5cf6 18%, transparent) 0, transparent 38%), linear-gradient(145deg, color-mix(in srgb, var(--panel) 88%, #1e293b 12%), color-mix(in srgb, var(--panel) 90%, #312e81 10%))",
+  },
+]
+
 function colorValue(key: string) {
-  return noteColors.find((item) => item.key === key)?.value || noteColors[0].value
+  return (
+    noteColors.find((item) => item.key === key)?.value ||
+    noteThemes.find((item) => item.key === key)?.value ||
+    noteColors[0].value
+  )
 }
 
 function emptyNote(note: Note) {
@@ -894,12 +931,69 @@ export default function NotesPage() {
               </div>
 
               <div className="mt-6 border-t pt-5" style={{ borderColor: "var(--line)" }}>
-                <div className="flex items-center gap-2"><Palette size={16} className="accent" /><p className="text-xs font-black uppercase tracking-wider muted">Card color</p></div>
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <Palette size={16} className="accent" />
+                  <p className="text-xs font-black uppercase tracking-wider muted">Note appearance</p>
+                </div>
+
+                <p className="mt-3 text-[10px] font-black uppercase tracking-[0.16em] muted">Colors</p>
+                <div className="mt-2 flex flex-wrap gap-2">
                   {noteColors.map((color) => (
-                    <button key={color.key} type="button" title={color.label} onClick={() => updateDraft({ color: color.key })} className={`h-9 w-9 rounded-full border-2 ${draft.color === color.key ? "ring-2 ring-emerald-300/60 ring-offset-2 ring-offset-transparent" : ""}`} style={{ background: color.value, borderColor: draft.color === color.key ? "var(--accent)" : "var(--line)" }} />
+                    <button
+                      key={color.key}
+                      type="button"
+                      title={color.label}
+                      aria-label={`Use ${color.label} color`}
+                      onClick={() => updateDraft({ color: color.key })}
+                      className={`h-9 w-9 rounded-full border-2 transition hover:-translate-y-0.5 ${
+                        draft.color === color.key
+                          ? "ring-2 ring-emerald-300/60 ring-offset-2 ring-offset-transparent"
+                          : ""
+                      }`}
+                      style={{
+                        background: color.value,
+                        borderColor: draft.color === color.key ? "var(--accent)" : "var(--line)",
+                      }}
+                    />
                   ))}
                 </div>
+
+                <p className="mt-5 text-[10px] font-black uppercase tracking-[0.16em] muted">Background themes</p>
+                <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {noteThemes.map((theme) => (
+                    <button
+                      key={theme.key}
+                      type="button"
+                      onClick={() => updateDraft({ color: theme.key })}
+                      className={`group relative min-h-16 overflow-hidden rounded-2xl border p-2 text-left transition hover:-translate-y-0.5 ${
+                        draft.color === theme.key
+                          ? "ring-2 ring-emerald-300/60 ring-offset-2 ring-offset-transparent"
+                          : ""
+                      }`}
+                      style={{
+                        background: theme.value,
+                        backgroundSize: theme.key === "theme-finance" ? "18px 18px, 18px 18px, auto" : undefined,
+                        borderColor: draft.color === theme.key ? "var(--accent)" : "var(--line)",
+                        color: "var(--text)",
+                      }}
+                      aria-label={`Use ${theme.label} theme`}
+                    >
+                      <span
+                        className="inline-flex rounded-lg px-2 py-1 text-[10px] font-black"
+                        style={{
+                          background: "color-mix(in srgb, var(--panel) 72%, transparent)",
+                          border: "1px solid var(--line)",
+                        }}
+                      >
+                        {theme.label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                <p className="mt-3 text-[11px] leading-5 muted">
+                  Themes are lightweight CSS backgrounds and are saved with each note just like colors.
+                </p>
               </div>
             </div>
 
