@@ -85,16 +85,16 @@ const noteColors = [
 
 const noteThemes = [
   {
-    key: "theme-aurora",
-    label: "Aurora",
+    key: "theme-forest",
+    label: "Forest",
     value:
-      "radial-gradient(circle at 15% 15%, color-mix(in srgb, #10b981 24%, transparent) 0, transparent 38%), radial-gradient(circle at 85% 20%, color-mix(in srgb, #8b5cf6 20%, transparent) 0, transparent 42%), linear-gradient(135deg, color-mix(in srgb, var(--panel) 92%, #10b981 8%), color-mix(in srgb, var(--panel) 92%, #8b5cf6 8%))",
+      "radial-gradient(circle at 16% 18%, color-mix(in srgb, #22c55e 32%, transparent) 0, transparent 40%), radial-gradient(circle at 84% 82%, color-mix(in srgb, #84cc16 24%, transparent) 0, transparent 44%), linear-gradient(135deg, color-mix(in srgb, var(--panel) 78%, #166534 22%), color-mix(in srgb, var(--panel) 82%, #3f6212 18%))",
   },
   {
-    key: "theme-finance",
-    label: "Finance Grid",
+    key: "theme-sunset",
+    label: "Sunset",
     value:
-      "linear-gradient(color-mix(in srgb, var(--text) 6%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--text) 6%, transparent) 1px, transparent 1px), linear-gradient(135deg, color-mix(in srgb, var(--panel) 94%, #10b981 6%), var(--panel))",
+      "radial-gradient(circle at 18% 20%, color-mix(in srgb, #fb7185 32%, transparent) 0, transparent 42%), radial-gradient(circle at 82% 82%, color-mix(in srgb, #f59e0b 28%, transparent) 0, transparent 44%), linear-gradient(135deg, color-mix(in srgb, var(--panel) 82%, #fb7185 18%), color-mix(in srgb, var(--panel) 82%, #f59e0b 18%))",
   },
   {
     key: "theme-paper",
@@ -109,10 +109,10 @@ const noteThemes = [
       "radial-gradient(ellipse at 0% 100%, color-mix(in srgb, #14b8a6 18%, transparent) 0 32%, transparent 33%), radial-gradient(ellipse at 35% 110%, color-mix(in srgb, #38bdf8 14%, transparent) 0 34%, transparent 35%), linear-gradient(145deg, color-mix(in srgb, var(--panel) 94%, #14b8a6 6%), var(--panel))",
   },
   {
-    key: "theme-midnight",
-    label: "Midnight",
+    key: "theme-ocean",
+    label: "Ocean",
     value:
-      "radial-gradient(circle at 80% 15%, color-mix(in srgb, #8b5cf6 18%, transparent) 0, transparent 38%), linear-gradient(145deg, color-mix(in srgb, var(--panel) 88%, #1e293b 12%), color-mix(in srgb, var(--panel) 90%, #312e81 10%))",
+      "radial-gradient(circle at 15% 15%, color-mix(in srgb, #0ea5e9 34%, transparent) 0, transparent 40%), radial-gradient(circle at 85% 80%, color-mix(in srgb, #06b6d4 28%, transparent) 0, transparent 44%), linear-gradient(145deg, color-mix(in srgb, var(--panel) 80%, #0284c7 20%), color-mix(in srgb, var(--panel) 82%, #0891b2 18%))",
   },
 ]
 
