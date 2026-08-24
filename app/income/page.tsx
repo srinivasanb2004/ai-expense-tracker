@@ -48,10 +48,12 @@ function DateField({
   max?: string
 }) {
   const [value, setValue] = useState(defaultValue)
+  const [focused, setFocused] = useState(Boolean(defaultValue))
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     setValue(defaultValue)
+    setFocused(Boolean(defaultValue))
   }, [defaultValue])
 
   useEffect(() => {
@@ -60,34 +62,52 @@ function DateField({
 
     function handleReset() {
       setValue(defaultValue)
+      setFocused(Boolean(defaultValue))
     }
 
     form.addEventListener("reset", handleReset)
-    return () => form.removeEventListener("reset", handleReset)
+
+    return () => {
+      form.removeEventListener("reset", handleReset)
+    }
   }, [defaultValue])
 
-  return (
-    <div className="relative min-w-0">
-      <input
-        ref={inputRef}
-        name={name}
-        type="date"
-        value={value}
-        required={required}
-        max={max}
-        onChange={(e) => setValue(e.target.value)}
-        className={`input w-full ${!value ? "text-transparent" : ""}`}
-      />
+  const showDateInput = focused || Boolean(value)
 
-      {!value && (
-        <span
-          className="pointer-events-none absolute inset-y-0 left-0 flex items-center px-4 text-sm"
-          style={{ color: "var(--muted)" }}
-        >
-          {placeholder}
-        </span>
-      )}
-    </div>
+  function openDatePicker() {
+    setFocused(true)
+
+    requestAnimationFrame(() => {
+      try {
+        inputRef.current?.showPicker?.()
+      } catch {
+        // Browser may open the picker automatically
+      }
+    })
+  }
+
+  return (
+    <input
+      ref={inputRef}
+      name={name}
+      type={showDateInput ? "date" : "text"}
+      value={value}
+      placeholder={placeholder}
+      required={required}
+      max={showDateInput ? max : undefined}
+      readOnly={!showDateInput}
+      onFocus={openDatePicker}
+      onClick={openDatePicker}
+      onChange={(e) => {
+        setValue(e.target.value)
+      }}
+      onBlur={() => {
+        if (!value) {
+          setFocused(false)
+        }
+      }}
+      className="input w-full"
+    />
   )
 }
 
