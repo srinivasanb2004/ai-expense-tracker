@@ -252,7 +252,10 @@ export default function NotesPage() {
     setCreatedSuggestionIds([])
   }
 
-  async function persist(note: Note) {
+  async function persist(
+    note: Note,
+    syncEditor = true
+  ) {
     setSaveState("saving")
     try {
       const response = await fetch(`/api/notes/${note.id}`, {
@@ -270,20 +273,31 @@ export default function NotesPage() {
       })
       const updated = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(updated.error || "Could not save note.")
-      setNotes((current) => current.map((item) => (item.id === updated.id ? updated : item)))
-      setEditing(updated)
-      setDraft((current) => {
-        if (!current) return null
+      setNotes((current) =>
+        current.map((item) =>
+          item.id === updated.id
+            ? updated
+            : item
+        )
+      )
 
-        if (current.id !== updated.id) {
-          return current
-        }
+      if (syncEditor) {
+        setEditing(updated)
 
-        return {
-          ...current,
-          updatedAt: updated.updatedAt,
-        } as Note
-      })
+        setDraft((current) => {
+          if (!current) return null
+
+          if (current.id !== updated.id) {
+            return current
+          }
+
+          return {
+            ...current,
+            updatedAt: updated.updatedAt,
+          } as Note
+        })
+      }
+
       setSaveState("saved")
     } catch {
       setSaveState("error")
@@ -309,20 +323,70 @@ export default function NotesPage() {
       return
     }
 
+    const noteToClose = {
+      ...draft,
+      items: draft.items.map((item) => ({
+        ...item,
+      })),
+    }
+
+    const needsSave =
+      saveState === "saving" ||
+      saveState === "error" ||
+      JSON.stringify(noteToClose) !==
+        JSON.stringify(editing)
+
     if (saveTimer.current) {
       clearTimeout(saveTimer.current)
       saveTimer.current = null
     }
 
-    if (emptyNote(draft)) {
-      await fetch(`/api/notes/${draft.id}`, { method: "DELETE" }).catch(() => null)
-      setNotes((current) => current.filter((item) => item.id !== draft.id))
-    } else if (saveState === "saving" || saveState === "error" || JSON.stringify(draft) !== JSON.stringify(editing)) {
-      await persist(draft)
-    }
+    /*
+      Close the editor immediately.
 
+      Previously we waited for persist() before
+      clearing draft/editing. On a slower network,
+      the user had to press X multiple times because
+      the modal stayed visible while the save request
+      was completing.
+    */
     setEditing(null)
     setDraft(null)
+    setTagInput("")
+    setAiAnalysis(null)
+    setAiError("")
+    setActionSuggestion(null)
+    setActionForm({})
+    setActionError("")
+
+    if (emptyNote(noteToClose)) {
+      await fetch(
+        `/api/notes/${noteToClose.id}`,
+        {
+          method: "DELETE",
+        }
+      ).catch(() => null)
+
+      setNotes((current) =>
+        current.filter(
+          (item) =>
+            item.id !== noteToClose.id
+        )
+      )
+
+      return
+    }
+
+    if (needsSave) {
+      /*
+        Save the final snapshot without syncing the
+        closed editor state back into the modal.
+      */
+      await persist(
+        noteToClose,
+        false
+      )
+    }
   }
 
   async function quickPatch(note: Note, patch: Partial<Note>) {
