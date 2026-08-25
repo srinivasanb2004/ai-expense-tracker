@@ -92,8 +92,8 @@ async function getNativeToken(): Promise<
       let errorListener: any
       let timeout:
         | ReturnType<
-            typeof setTimeout
-          >
+          typeof setTimeout
+        >
         | undefined
 
       const cleanup =
@@ -105,12 +105,12 @@ async function getNativeToken(): Promise<
           try {
             await registrationListener
               ?.remove?.()
-          } catch {}
+          } catch { }
 
           try {
             await errorListener
               ?.remove?.()
-          } catch {}
+          } catch { }
         }
 
       const finish =
@@ -135,7 +135,7 @@ async function getNativeToken(): Promise<
             (token: any) => {
               void finish(
                 token?.value ||
-                  null
+                null
               )
             }
           )
@@ -279,6 +279,22 @@ export default function PushNotificationsSettings() {
             setSupported(true)
           }
 
+          /*
+            Create Android notification channel.
+        
+            Android 8+ uses notification channels
+            to control sound, priority and visibility.
+          */
+          await nativePush.createChannel({
+            id: "walletiq-default",
+            name: "WalletIQ Notifications",
+            description:
+              "WalletIQ financial reminders and alerts",
+            importance: 5,
+            visibility: 1,
+            sound: "default",
+          })
+
           const permission =
             await nativePush
               .checkPermissions()
@@ -324,14 +340,14 @@ export default function PushNotificationsSettings() {
             response.ok
               ? await response.json()
               : {
-                  enabled:
-                    false,
-                }
+                enabled:
+                  false,
+              }
 
           if (!cancelled) {
             setDeviceEnabled(
               data.enabled ===
-                true
+              true
             )
           }
 
@@ -449,7 +465,7 @@ export default function PushNotificationsSettings() {
         if (!cancelled) {
           setDeviceEnabled(
             data.enabled ===
-              true
+            true
           )
         }
       } catch (error) {
@@ -490,35 +506,35 @@ export default function PushNotificationsSettings() {
     if (nativePush) {
       let listener: any
 
-      ;(async () => {
-        listener =
-          await nativePush
-            .addListener(
-              "pushNotificationReceived",
-              (
-                notification: any
-              ) => {
-                const title =
-                  notification
-                    ?.title ||
-                  "WalletIQ"
+        ; (async () => {
+          listener =
+            await nativePush
+              .addListener(
+                "pushNotificationReceived",
+                (
+                  notification: any
+                ) => {
+                  const title =
+                    notification
+                      ?.title ||
+                    "WalletIQ"
 
-                const body =
-                  notification
-                    ?.body ||
-                  "You have a new notification."
+                  const body =
+                    notification
+                      ?.body ||
+                    "You have a new notification."
 
-                setMessage(
-                  `${title}: ${body}`
-                )
-              }
-            )
-      })()
+                  setMessage(
+                    `${title}: ${body}`
+                  )
+                }
+              )
+        })()
 
       return () => {
         try {
           void listener?.remove?.()
-        } catch {}
+        } catch { }
       }
     }
 
@@ -528,92 +544,92 @@ export default function PushNotificationsSettings() {
       | (() => void)
       | undefined
 
-    ;(async () => {
-      const messaging =
-        await browserMessaging()
+      ; (async () => {
+        const messaging =
+          await browserMessaging()
 
-      if (!messaging) {
-        return
-      }
+        if (!messaging) {
+          return
+        }
 
-      unsubscribe =
-        onMessage(
-          messaging,
-          async (
-            payload
-          ) => {
-            const title =
-              payload.data
-                ?.title ||
+        unsubscribe =
+          onMessage(
+            messaging,
+            async (
               payload
-                .notification
-                ?.title ||
-              "WalletIQ"
+            ) => {
+              const title =
+                payload.data
+                  ?.title ||
+                payload
+                  .notification
+                  ?.title ||
+                "WalletIQ"
 
-            const body =
-              payload.data
-                ?.body ||
-              payload
-                .notification
-                ?.body ||
-              "You have a new notification."
+              const body =
+                payload.data
+                  ?.body ||
+                payload
+                  .notification
+                  ?.body ||
+                "You have a new notification."
 
-            const url =
-              payload.data
-                ?.url ||
-              "/dashboard"
+              const url =
+                payload.data
+                  ?.url ||
+                "/dashboard"
 
-            setMessage(
-              `${title}: ${body}`
-            )
+              setMessage(
+                `${title}: ${body}`
+              )
 
-            if (
-              "Notification" in
+              if (
+                "Notification" in
                 window &&
-              Notification
-                .permission ===
+                Notification
+                  .permission ===
                 "granted"
-            ) {
-              try {
-                const registration =
-                  await navigator
-                    .serviceWorker
-                    .ready
-
-                await registration
-                  .showNotification(
-                    title,
-                    {
-                      body,
-
-                      icon:
-                        "/icon.png",
-
-                      badge:
-                        "/icon.png",
-
-                      data: {
-                        url,
-                      },
-
-                      tag:
-                        payload
-                          .messageId ||
-                        `walletiq-${Date.now()}`,
-                    }
-                  )
-              } catch (
-                error
               ) {
-                console.error(
-                  "WalletIQ foreground notification error:",
-                  error
-                )
+                try {
+                  const registration =
+                    await navigator
+                      .serviceWorker
+                      .ready
+
+                  await registration
+                    .showNotification(
+                      title,
+                      {
+                        body,
+
+                        icon:
+                          "/icon.png",
+
+                        badge:
+                          "/icon.png",
+
+                        data: {
+                          url,
+                        },
+
+                        tag:
+                          payload
+                            .messageId ||
+                          `walletiq-${Date.now()}`,
+                      }
+                    )
+                } catch (
+                error
+                ) {
+                  console.error(
+                    "WalletIQ foreground notification error:",
+                    error
+                  )
+                }
               }
             }
-          }
-        )
-    })()
+          )
+      })()
 
     return () => {
       unsubscribe?.()
@@ -634,35 +650,35 @@ export default function PushNotificationsSettings() {
 
     let listener: any
 
-    ;(async () => {
-      listener =
-        await nativePush
-          .addListener(
-            "pushNotificationActionPerformed",
-            (
-              action: any
-            ) => {
-              const url =
-                action
-                  ?.notification
-                  ?.data?.url
+      ; (async () => {
+        listener =
+          await nativePush
+            .addListener(
+              "pushNotificationActionPerformed",
+              (
+                action: any
+              ) => {
+                const url =
+                  action
+                    ?.notification
+                    ?.data?.url
 
-              if (
-                typeof url ===
+                if (
+                  typeof url ===
                   "string" &&
-                url.startsWith("/")
-              ) {
-                window.location.href =
-                  url
+                  url.startsWith("/")
+                ) {
+                  window.location.href =
+                    url
+                }
               }
-            }
-          )
-    })()
+            )
+      })()
 
     return () => {
       try {
         void listener?.remove?.()
-      } catch {}
+      } catch { }
     }
   }, [])
 
@@ -794,7 +810,7 @@ export default function PushNotificationsSettings() {
         if (!response.ok) {
           throw new Error(
             data.error ||
-              "Could not save this Android device."
+            "Could not save this Android device."
           )
         }
 
@@ -910,7 +926,7 @@ export default function PushNotificationsSettings() {
       if (!response.ok) {
         throw new Error(
           data.error ||
-            "Could not save this device."
+          "Could not save this device."
         )
       }
 
@@ -991,7 +1007,7 @@ export default function PushNotificationsSettings() {
         if (!response.ok) {
           throw new Error(
             data.error ||
-              "Could not remove this Android device."
+            "Could not remove this Android device."
           )
         }
 
@@ -1030,9 +1046,9 @@ export default function PushNotificationsSettings() {
 
               ...(registration
                 ? {
-                    serviceWorkerRegistration:
-                      registration,
-                  }
+                  serviceWorkerRegistration:
+                    registration,
+                }
                 : {}),
             }
           ).catch(
@@ -1121,7 +1137,7 @@ export default function PushNotificationsSettings() {
       if (!response.ok) {
         throw new Error(
           data.error ||
-            "Test notification failed."
+          "Test notification failed."
         )
       }
 
