@@ -493,7 +493,8 @@ export default function PushNotificationsSettings() {
     }
   }, [])
 
-  /* ========================================
+
+    /* ========================================
      FOREGROUND NOTIFICATIONS
   ======================================== */
 
@@ -501,135 +502,104 @@ export default function PushNotificationsSettings() {
     const nativePush =
       getNativePushPlugin()
 
-    /* NATIVE ANDROID */
+    /* ==============================
+       NATIVE ANDROID
+    ============================== */
 
     if (nativePush) {
       let listener: any
 
-        ; (async () => {
-          listener =
-            await nativePush
-              .addListener(
-                "pushNotificationReceived",
-                (
-                  notification: any
-                ) => {
-                  const title =
-                    notification
-                      ?.title ||
-                    "WalletIQ"
+      ;(async () => {
+        listener =
+          await nativePush.addListener(
+            "pushNotificationReceived",
+            (notification: any) => {
+              const title =
+                notification?.title ||
+                "WalletIQ"
 
-                  const body =
-                    notification
-                      ?.body ||
-                    "You have a new notification."
+              const body =
+                notification?.body ||
+                "You have a new notification."
 
-                  setMessage(
-                    `${title}: ${body}`
-                  )
-                }
+              /*
+                When WalletIQ is open in the
+                foreground, Android does not
+                need another manually-created
+                system notification.
+
+                We simply show the received
+                notification message inside
+                WalletIQ.
+              */
+
+              setMessage(
+                `${title}: ${body}`
               )
-        })()
+            }
+          )
+      })()
 
       return () => {
         try {
           void listener?.remove?.()
-        } catch { }
+        } catch {}
       }
     }
 
-    /* WEB */
+    /* ==============================
+       WEB / PWA
+    ============================== */
 
     let unsubscribe:
       | (() => void)
       | undefined
 
-      ; (async () => {
-        const messaging =
-          await browserMessaging()
+    ;(async () => {
+      const messaging =
+        await browserMessaging()
 
-        if (!messaging) {
-          return
-        }
+      if (!messaging) {
+        return
+      }
 
-        unsubscribe =
-          onMessage(
-            messaging,
-            async (
-              payload
-            ) => {
-              const title =
-                payload.data
-                  ?.title ||
-                payload
-                  .notification
-                  ?.title ||
-                "WalletIQ"
+      unsubscribe =
+        onMessage(
+          messaging,
+          (payload) => {
+            const title =
+              payload.data?.title ||
+              payload.notification?.title ||
+              "WalletIQ"
 
-              const body =
-                payload.data
-                  ?.body ||
-                payload
-                  .notification
-                  ?.body ||
-                "You have a new notification."
+            const body =
+              payload.data?.body ||
+              payload.notification?.body ||
+              "You have a new notification."
 
-              const url =
-                payload.data
-                  ?.url ||
-                "/dashboard"
+            /*
+              IMPORTANT:
 
-              setMessage(
-                `${title}: ${body}`
-              )
+              Do NOT call
+              registration.showNotification()
+              here.
 
-              if (
-                "Notification" in
-                window &&
-                Notification
-                  .permission ===
-                "granted"
-              ) {
-                try {
-                  const registration =
-                    await navigator
-                      .serviceWorker
-                      .ready
+              Firebase already handles the
+              notification payload.
 
-                  await registration
-                    .showNotification(
-                      title,
-                      {
-                        body,
+              Manually calling
+              showNotification() here was
+              causing the laptop/browser to
+              display the same notification
+              twice.
+            */
 
-                        icon:
-                          "/icon.png",
-
-                        badge:
-                          "/icon.png",
-
-                        data: {
-                          url,
-                        },
-
-                        tag:
-                          payload
-                            .messageId ||
-                          `walletiq-${Date.now()}`,
-                      }
-                    )
-                } catch (
-                error
-                ) {
-                  console.error(
-                    "WalletIQ foreground notification error:",
-                    error
-                  )
-                }
-              }
-            }
-          )
-      })()
+            setMessage(
+              `${title}: ${body}`
+            )
+          }
+        )
+    })()
 
     return () => {
       unsubscribe?.()
