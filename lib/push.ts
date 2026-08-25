@@ -145,14 +145,24 @@ export async function deliverNotificationPush(
       await adminMessaging().send({
         token: sub.token,
 
+        notification: {
+          title: notification.title,
+          body: notification.body,
+        },
+
         data: {
-          title:
-            notification.title,
-
-          body:
-            notification.body,
-
+          title: notification.title,
+          body: notification.body,
           url,
+        },
+
+        android: {
+          priority: "high",
+
+          notification: {
+            channelId: "walletiq-default",
+            sound: "default",
+          },
         },
       })
 
@@ -300,7 +310,7 @@ export async function deliverPendingPushes(
   const since =
     new Date(
       Date.now() -
-        36 * 60 * 60 * 1000
+      36 * 60 * 60 * 1000
     )
 
   const notifications =
