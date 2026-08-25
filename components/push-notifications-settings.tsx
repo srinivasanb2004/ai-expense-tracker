@@ -9,7 +9,6 @@ import {
 import {
   deleteToken,
   getToken,
-  onMessage,
 } from "firebase/messaging"
 
 import {
@@ -69,36 +68,6 @@ function getNativePushPlugin(): any | null {
 
 function isNativeAndroid() {
   return getNativePushPlugin() !== null
-}
-
-function getNativeLocalNotificationsPlugin(): any | null {
-  if (typeof window === "undefined") {
-    return null
-  }
-
-  const capacitor =
-    (window as any).Capacitor
-
-  if (
-    !capacitor ||
-    capacitor?.isNativePlatform?.() !== true ||
-    capacitor?.getPlatform?.() !== "android"
-  ) {
-    return null
-  }
-
-  if (
-    capacitor?.isPluginAvailable?.(
-      "LocalNotifications"
-    ) !== true
-  ) {
-    return null
-  }
-
-  return (
-    capacitor?.Plugins
-      ?.LocalNotifications || null
-  )
 }
 
 /* ========================================
@@ -354,31 +323,25 @@ export default function PushNotificationsSettings() {
 
             return
           }
-
           const response =
             await fetch(
-              `/api/push/subscription?token=${encodeURIComponent(
-                token
-              )}`,
+              "/api/push/subscription",
               {
-                cache:
-                  "no-store",
+                method: "POST",
+                headers: {
+                  "Content-Type":
+                    "application/json",
+                },
+                body: JSON.stringify({
+                  token,
+                  userAgent:
+                    `WalletIQ Android | ${navigator.userAgent}`,
+                }),
               }
             )
-
-          const data =
-            response.ok
-              ? await response.json()
-              : {
-                enabled:
-                  false,
-              }
 
           if (!cancelled) {
-            setDeviceEnabled(
-              data.enabled ===
-              true
-            )
+            setDeviceEnabled(response.ok)
           }
 
           return
@@ -467,36 +430,25 @@ export default function PushNotificationsSettings() {
 
           return
         }
-
         const response =
           await fetch(
-            `/api/push/subscription?token=${encodeURIComponent(
-              token
-            )}`,
+            "/api/push/subscription",
             {
-              cache:
-                "no-store",
+              method: "POST",
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+              body: JSON.stringify({
+                token,
+                userAgent:
+                  navigator.userAgent,
+              }),
             }
           )
 
-        if (!response.ok) {
-          if (!cancelled) {
-            setDeviceEnabled(
-              false
-            )
-          }
-
-          return
-        }
-
-        const data =
-          await response.json()
-
         if (!cancelled) {
-          setDeviceEnabled(
-            data.enabled ===
-            true
-          )
+          setDeviceEnabled(response.ok)
         }
       } catch (error) {
         console.error(
@@ -523,182 +475,6 @@ export default function PushNotificationsSettings() {
     }
   }, [])
 
-
-    /* ========================================
-     FOREGROUND NOTIFICATIONS
-  ======================================== */
-
-  useEffect(() => {
-    const nativePush =
-      getNativePushPlugin()
-
-    /* ==============================
-       NATIVE ANDROID
-    ============================== */
-
-    if (nativePush) {
-      let listener: any
-
-      ;(async () => {
-        listener =
-          await nativePush.addListener(
-            "pushNotificationReceived",
-            async (notification: any) => {
-              const title =
-                notification?.title ||
-                notification?.data?.title ||
-                "WalletIQ"
-
-              const body =
-                notification?.body ||
-                notification?.data?.body ||
-                "You have a new notification."
-
-              const url =
-                notification?.data?.url ||
-                "/dashboard"
-
-              setMessage(
-                `${title}: ${body}`
-              )
-
-              const localNotifications =
-                getNativeLocalNotificationsPlugin()
-
-              if (!localNotifications) {
-                console.error(
-                  "LocalNotifications plugin is not available."
-                )
-
-                return
-              }
-
-              try {
-                await localNotifications.schedule({
-                  notifications: [
-                    {
-                      id:
-                        Math.floor(
-                          Date.now() / 1000
-                        ) % 2147483647,
-
-                      title,
-
-                      body,
-
-                      channelId:
-                        "walletiq-default",
-
-                      extra: {
-                        url,
-                      },
-                    },
-                  ],
-                })
-              } catch (error) {
-                console.error(
-                  "WalletIQ foreground local notification error:",
-                  error
-                )
-              }
-            }
-          )
-      })()
-
-      return () => {
-        try {
-          void listener?.remove?.()
-        } catch {}
-      }
-    }
-
-    /* ==============================
-       WEB / LAPTOP
-    ============================== */
-
-    let unsubscribe:
-      | (() => void)
-      | undefined
-
-    ;(async () => {
-      const messaging =
-        await browserMessaging()
-
-      if (!messaging) {
-        return
-      }
-
-      unsubscribe =
-        onMessage(
-          messaging,
-          (payload) => {
-            const title =
-              payload.data?.title ||
-              payload.notification?.title ||
-              "WalletIQ"
-
-            const body =
-              payload.data?.body ||
-              payload.notification?.body ||
-              "You have a new notification."
-
-            setMessage(
-              `${title}: ${body}`
-            )
-          }
-        )
-    })()
-
-    return () => {
-      unsubscribe?.()
-    }
-  }, [])
-
-  /* ========================================
-     NATIVE NOTIFICATION TAP
-  ======================================== */
-
-  useEffect(() => {
-    const nativePush =
-      getNativePushPlugin()
-
-    if (!nativePush) {
-      return
-    }
-
-    let listener: any
-
-      ; (async () => {
-        listener =
-          await nativePush
-            .addListener(
-              "pushNotificationActionPerformed",
-              (
-                action: any
-              ) => {
-                const url =
-                  action
-                    ?.notification
-                    ?.data?.url
-
-                if (
-                  typeof url ===
-                  "string" &&
-                  url.startsWith("/")
-                ) {
-                  window.location.href =
-                    url
-                }
-              }
-            )
-      })()
-
-    return () => {
-      try {
-        void listener?.remove?.()
-      } catch { }
-    }
-  }, [])
 
   /* ========================================
      SAVE PREFERENCES

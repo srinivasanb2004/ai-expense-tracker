@@ -134,6 +134,56 @@ export async function POST(
     const tokenValue =
       String(token)
 
+    const userAgentValue =
+      userAgent
+        ? String(userAgent)
+        : null
+
+    /*
+      Keep only one current FCM token for this exact device/browser
+      identity. Firebase can rotate tokens over time; without cleanup,
+      stale tokens for the same browser can make WalletIQ deliver the
+      same notification more than once.
+    */
+
+    if (userAgentValue) {
+      const staleSubscriptions =
+        await prisma.pushSubscription.findMany({
+          where: {
+            userId,
+            userAgent: userAgentValue,
+            token: {
+              not: tokenValue,
+            },
+          },
+          select: {
+            id: true,
+          },
+        })
+
+      if (staleSubscriptions.length) {
+        const staleIds =
+          staleSubscriptions.map((item) => item.id)
+
+        await prisma.$transaction([
+          prisma.pushDelivery.deleteMany({
+            where: {
+              subscriptionId: {
+                in: staleIds,
+              },
+            },
+          }),
+          prisma.pushSubscription.deleteMany({
+            where: {
+              id: {
+                in: staleIds,
+              },
+            },
+          }),
+        ])
+      }
+    }
+
     /*
       FCM token is globally unique.
 
@@ -190,11 +240,7 @@ export async function POST(
               userId,
 
               userAgent:
-                userAgent
-                  ? String(
-                      userAgent
-                    )
-                  : null,
+                userAgentValue,
             },
           })
     } else {
@@ -211,11 +257,7 @@ export async function POST(
               userId,
 
               userAgent:
-                userAgent
-                  ? String(
-                      userAgent
-                    )
-                  : null,
+                userAgentValue,
             },
 
             create: {
@@ -225,11 +267,7 @@ export async function POST(
                 tokenValue,
 
               userAgent:
-                userAgent
-                  ? String(
-                      userAgent
-                    )
-                  : null,
+                userAgentValue,
             },
           })
     }

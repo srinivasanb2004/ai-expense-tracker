@@ -1,6 +1,7 @@
 import Sidebar from "./sidebar"
 import Topbar from "./topbar"
 import NetworkStatus from "./network-status"
+import PushRuntime from "./push-runtime"
 
 export default function AppShell({
   children,
@@ -26,6 +27,9 @@ export default function AppShell({
         <div className="ambient-orb ambient-orb-two" />
         <div className="ambient-orb ambient-orb-three" />
       </div>
+
+      {/* Global push runtime */}
+      <PushRuntime />
 
       {/* App UI */}
       <div className="relative z-10">

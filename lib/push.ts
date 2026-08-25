@@ -164,6 +164,18 @@ export async function deliverNotificationPush(
             sound: "default",
           },
         },
+
+        webpush: {
+          notification: {
+            title: notification.title,
+            body: notification.body,
+            icon: "/icon.png",
+          },
+
+          fcmOptions: {
+            link: `${process.env.NEXTAUTH_URL || "https://ai-expense-tracker-sage-seven.vercel.app"}${url}`,
+          },
+        },
       })
 
       /*
