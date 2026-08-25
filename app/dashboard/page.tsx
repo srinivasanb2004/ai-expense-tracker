@@ -16,6 +16,7 @@ import {
   RefreshCw,
 } from "lucide-react"
 import Greeting from "@/components/greeting"
+import Link from "next/link"
 
 function money(value: number) {
   return new Intl.NumberFormat("en-IN", {
@@ -70,6 +71,10 @@ export default async function Dashboard() {
               lt: end,
             },
           },
+          select: {
+            amount: true,
+            category: true,
+          },
         }),
 
         prisma.income.findMany({
@@ -80,6 +85,9 @@ export default async function Dashboard() {
               lt: end,
             },
           },
+          select: {
+            amount: true,
+          },
         }),
 
         prisma.budget.findMany({
@@ -87,6 +95,9 @@ export default async function Dashboard() {
             userId,
             month: now.getMonth() + 1,
             year: now.getFullYear(),
+          },
+          select: {
+            amount: true,
           },
         }),
 
@@ -98,11 +109,24 @@ export default async function Dashboard() {
             date: "desc",
           },
           take: 6,
+          select: {
+            id: true,
+            merchant: true,
+            category: true,
+            amount: true,
+            date: true,
+          },
         }),
 
         prisma.borrowLend.findMany({
           where: { userId, status: { not: "SETTLED" } },
-          include: { repayments: true },
+          select: {
+            type: true,
+            amount: true,
+            repayments: {
+              select: { amount: true },
+            },
+          },
         }),
       ])
   } catch (error) {
@@ -133,13 +157,13 @@ export default async function Dashboard() {
               and try again.
             </p>
 
-            <a
+            <Link
               href="/dashboard"
               className="btn btn-primary mt-6"
             >
               <RefreshCw size={17} />
               Try Again
-            </a>
+            </Link>
 
             <p className="mt-4 text-xs muted">
               Your existing financial data is safe.
@@ -222,37 +246,37 @@ export default async function Dashboard() {
         className="mt-5 flex flex-wrap gap-2"
         aria-label="Quick actions"
       >
-        <a
+        <Link
           href="/expenses?new=1"
           className="btn btn-primary"
         >
           <Plus size={16} />
           Add expense
-        </a>
+        </Link>
 
-        <a
+        <Link
           href="/income"
           className="btn btn-secondary"
         >
           <ArrowUpRight size={16} />
           Add income
-        </a>
+        </Link>
 
-        <a
+        <Link
           href="/borrow-lend"
           className="btn btn-secondary"
         >
           <HandCoins size={16} />
           Borrow/Lend
-        </a>
+        </Link>
 
-        <a
+        <Link
           href="/scan"
           className="btn btn-secondary"
         >
           <ScanLine size={16} />
           Scan receipt
-        </a>
+        </Link>
       </section>
 
       {/* BALANCE HERO */}
@@ -359,8 +383,8 @@ export default async function Dashboard() {
       </section>
 
       <section className="mt-5 grid gap-4 sm:grid-cols-2">
-        <a href="/borrow-lend" className="stat-card block transition hover:-translate-y-0.5"><div className="flex items-center justify-between"><span className="metric-label">You owe</span><ArrowUpRight size={18} className="text-rose-400"/></div><p className="mt-4 text-2xl font-black">{money(youOwe)}</p><p className="mt-1 text-xs muted">Outstanding borrowed money</p></a>
-        <a href="/borrow-lend" className="stat-card block transition hover:-translate-y-0.5"><div className="flex items-center justify-between"><span className="metric-label">Owed to you</span><ArrowDownRight size={18} className="accent"/></div><p className="mt-4 text-2xl font-black">{money(owedToYou)}</p><p className="mt-1 text-xs muted">Outstanding money you lent</p></a>
+        <Link href="/borrow-lend" className="stat-card block transition hover:-translate-y-0.5"><div className="flex items-center justify-between"><span className="metric-label">You owe</span><ArrowUpRight size={18} className="text-rose-400"/></div><p className="mt-4 text-2xl font-black">{money(youOwe)}</p><p className="mt-1 text-xs muted">Outstanding borrowed money</p></Link>
+        <Link href="/borrow-lend" className="stat-card block transition hover:-translate-y-0.5"><div className="flex items-center justify-between"><span className="metric-label">Owed to you</span><ArrowDownRight size={18} className="accent"/></div><p className="mt-4 text-2xl font-black">{money(owedToYou)}</p><p className="mt-1 text-xs muted">Outstanding money you lent</p></Link>
       </section>
 
       {/* ACTIVITY + BUDGET */}
@@ -378,13 +402,13 @@ export default async function Dashboard() {
               </h3>
             </div>
 
-            <a
+            <Link
               href="/expenses"
               className="view-link"
             >
               View all
               <ArrowRight size={15} />
-            </a>
+            </Link>
           </div>
 
           <div className="mt-5 space-y-1">
@@ -507,13 +531,13 @@ export default async function Dashboard() {
                 : "Add expenses to unlock useful financial insights."}
             </p>
 
-            <a
+            <Link
               href="/analytics"
               className="mt-5 inline-flex items-center gap-2 text-sm font-black"
             >
               View analytics
               <ArrowRight size={15} />
-            </a>
+            </Link>
           </div>
         </div>
       </section>

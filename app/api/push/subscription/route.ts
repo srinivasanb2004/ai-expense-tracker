@@ -147,14 +147,29 @@ export async function POST(
     */
 
     if (userAgentValue) {
+      const isAndroidApp =
+        userAgentValue.startsWith("WalletIQ Android |")
+
       const staleSubscriptions =
         await prisma.pushSubscription.findMany({
           where: {
             userId,
-            userAgent: userAgentValue,
             token: {
               not: tokenValue,
             },
+            ...(isAndroidApp
+              ? { userAgent: userAgentValue }
+              : {
+                  OR: [
+                    { userAgent: userAgentValue },
+                    {
+                      userAgent: {
+                        not: { startsWith: "WalletIQ Android |" },
+                      },
+                    },
+                    { userAgent: null },
+                  ],
+                }),
           },
           select: {
             id: true,

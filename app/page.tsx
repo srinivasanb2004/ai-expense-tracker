@@ -1,5 +1,7 @@
 import Link from "next/link"
 import Logo from "@/components/logo"
+import { auth } from "@/auth"
+import { redirect } from "next/navigation"
 
 import {
   ArrowRight,
@@ -8,7 +10,13 @@ import {
   ChartPie,
 } from "lucide-react"
 
-export default function Home() {
+export default async function Home() {
+  const session = await auth()
+
+  if ((session?.user as any)?.id) {
+    redirect("/dashboard")
+  }
+
   return (
     <main className="min-h-screen">
       <nav className="mx-auto flex max-w-7xl items-center justify-between gap-3 p-5 sm:p-6">

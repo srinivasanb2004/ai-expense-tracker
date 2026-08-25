@@ -1,6 +1,6 @@
 "use client"
 
-import { onMessage } from "firebase/messaging"
+import { getToken, onMessage } from "firebase/messaging"
 import { useEffect } from "react"
 
 import { browserMessaging } from "@/lib/firebase-client"
@@ -159,6 +159,51 @@ export default function PushRuntime() {
     ;(async () => {
       const messaging = await browserMessaging()
       if (!messaging || cancelled) return
+
+      /*
+        Refresh/register the current browser token on every signed-in
+        WalletIQ app-shell load. The subscription endpoint removes stale
+        web tokens for this user, which prevents old Chrome registrations
+        from receiving the same push twice.
+      */
+      if (
+        "Notification" in window &&
+        Notification.permission === "granted" &&
+        "serviceWorker" in navigator
+      ) {
+        try {
+          const registration =
+            await navigator.serviceWorker.register(
+              "/firebase-messaging-sw.js"
+            )
+
+          const token = await getToken(messaging, {
+            vapidKey:
+              process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
+            serviceWorkerRegistration: registration,
+          })
+
+          if (token && !cancelled) {
+            await fetch("/api/push/subscription", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                token,
+                userAgent: navigator.userAgent,
+              }),
+            })
+          }
+        } catch (error) {
+          console.error(
+            "WalletIQ browser push refresh error:",
+            error
+          )
+        }
+      }
+
+      if (cancelled) return
 
       unsubscribe = onMessage(
         messaging,

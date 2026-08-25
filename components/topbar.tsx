@@ -13,6 +13,7 @@ import {
   Sun,
   Calculator,
   Copy,
+  Trash2,
 } from "lucide-react"
 
 import {
@@ -262,6 +263,22 @@ export default function Topbar() {
     )
 
     await loadNotifications()
+  }
+
+  async function clearAllNotifications() {
+    if (!items.length) return
+
+    const response = await fetch(
+      "/api/notifications",
+      { method: "DELETE" }
+    )
+
+    if (!response.ok) {
+      return
+    }
+
+    setItems([])
+    setUnread(0)
   }
 
 
@@ -584,7 +601,36 @@ export default function Topbar() {
           <span>AI Scan</span>
         </Link>
 
-        {/* MOBILE AI - 1ST */}
+        {/* MOBILE LIGHT/DARK */}
+
+        <button
+          type="button"
+          onClick={toggleTheme}
+          aria-label={
+            theme === "dark"
+              ? "Switch to light mode"
+              : "Switch to dark mode"
+          }
+          title={
+            theme === "dark"
+              ? "Light mode"
+              : "Dark mode"
+          }
+          className="grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-xl border transition hover:-translate-y-0.5 sm:h-10 sm:w-10 md:hidden"
+          style={{
+            borderColor: "var(--line)",
+            background: "var(--secondary)",
+            color: "var(--text)",
+          }}
+        >
+          {theme === "dark" ? (
+            <Sun size={18} />
+          ) : (
+            <Moon size={18} />
+          )}
+        </button>
+
+        {/* MOBILE AI */}
 
         <Link
           href="/assistant"
@@ -704,6 +750,18 @@ export default function Topbar() {
                       }
                     />
                   </button>
+
+                  {items.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={clearAllNotifications}
+                      aria-label="Clear all notifications"
+                      title="Clear all notifications"
+                      className="grid h-8 w-8 cursor-pointer place-items-center rounded-lg text-rose-400 transition hover:bg-rose-500/10"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  )}
 
                   {unread > 0 && (
                     <button

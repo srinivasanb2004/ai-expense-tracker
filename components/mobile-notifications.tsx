@@ -1,6 +1,6 @@
 "use client"
 
-import { Bell, CheckCheck } from "lucide-react"
+import { Bell, CheckCheck, Trash2 } from "lucide-react"
 import { useEffect, useState } from "react"
 
 type NotificationItem = {
@@ -43,6 +43,19 @@ export default function MobileNotifications() {
     await load()
   }
 
+  async function clearAll() {
+    if (!items.length) return
+
+    const response = await fetch("/api/notifications", {
+      method: "DELETE",
+    })
+
+    if (!response.ok) return
+
+    setItems([])
+    setUnread(0)
+  }
+
   return (
     <section className="soft-panel mt-6 md:hidden">
       <div className="flex items-center justify-between gap-3">
@@ -53,11 +66,24 @@ export default function MobileNotifications() {
             <p className="text-xs muted">{unread ? `${unread} unread` : "You're all caught up"}</p>
           </div>
         </div>
-        {unread > 0 && (
-          <button onClick={markAll} className="inline-flex items-center gap-1 text-xs font-bold accent">
-            <CheckCheck size={15} /> Mark all read
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {unread > 0 && (
+            <button onClick={markAll} className="inline-flex items-center gap-1 text-xs font-bold accent">
+              <CheckCheck size={15} /> Mark all read
+            </button>
+          )}
+          {items.length > 0 && (
+            <button
+              type="button"
+              onClick={clearAll}
+              aria-label="Clear all notifications"
+              title="Clear all notifications"
+              className="grid h-8 w-8 place-items-center rounded-lg text-rose-400 transition hover:bg-rose-500/10"
+            >
+              <Trash2 size={15} />
+            </button>
+          )}
+        </div>
       </div>
       <div className="mt-4 space-y-2">
         {items.slice(0, 8).map((item) => (

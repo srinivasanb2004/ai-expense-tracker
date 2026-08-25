@@ -158,3 +158,53 @@ export async function PATCH(req: Request) {
     )
   }
 }
+
+/*
+  DELETE
+  Clear all in-app notifications for the current user.
+  Push subscriptions/preferences are intentionally untouched.
+*/
+export async function DELETE() {
+  try {
+    const userId = await getUserId()
+
+    if (!userId) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      )
+    }
+
+    const notifications = await prisma.notification.findMany({
+      where: { userId },
+      select: { id: true },
+    })
+
+    const notificationIds = notifications.map((item) => item.id)
+
+    await prisma.$transaction([
+      prisma.pushDelivery.deleteMany({
+        where: {
+          userId,
+          ...(notificationIds.length
+            ? { notificationId: { in: notificationIds } }
+            : {}),
+        },
+      }),
+      prisma.notification.deleteMany({
+        where: { userId },
+      }),
+    ])
+
+    return NextResponse.json({
+      success: true,
+    })
+  } catch (error) {
+    console.error("Clear notifications error:", error)
+
+    return NextResponse.json(
+      { error: "Failed to clear notifications." },
+      { status: 500 }
+    )
+  }
+}
