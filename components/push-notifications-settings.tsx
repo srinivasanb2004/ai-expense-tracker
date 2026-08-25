@@ -71,6 +71,36 @@ function isNativeAndroid() {
   return getNativePushPlugin() !== null
 }
 
+function getNativeLocalNotificationsPlugin(): any | null {
+  if (typeof window === "undefined") {
+    return null
+  }
+
+  const capacitor =
+    (window as any).Capacitor
+
+  if (
+    !capacitor ||
+    capacitor?.isNativePlatform?.() !== true ||
+    capacitor?.getPlatform?.() !== "android"
+  ) {
+    return null
+  }
+
+  if (
+    capacitor?.isPluginAvailable?.(
+      "LocalNotifications"
+    ) !== true
+  ) {
+    return null
+  }
+
+  return (
+    capacitor?.Plugins
+      ?.LocalNotifications || null
+  )
+}
+
 /* ========================================
    GET NATIVE FCM TOKEN
 ======================================== */
@@ -513,29 +543,64 @@ export default function PushNotificationsSettings() {
         listener =
           await nativePush.addListener(
             "pushNotificationReceived",
-            (notification: any) => {
+            async (notification: any) => {
               const title =
                 notification?.title ||
+                notification?.data?.title ||
                 "WalletIQ"
 
               const body =
                 notification?.body ||
+                notification?.data?.body ||
                 "You have a new notification."
 
-              /*
-                When WalletIQ is open in the
-                foreground, Android does not
-                need another manually-created
-                system notification.
-
-                We simply show the received
-                notification message inside
-                WalletIQ.
-              */
+              const url =
+                notification?.data?.url ||
+                "/dashboard"
 
               setMessage(
                 `${title}: ${body}`
               )
+
+              const localNotifications =
+                getNativeLocalNotificationsPlugin()
+
+              if (!localNotifications) {
+                console.error(
+                  "LocalNotifications plugin is not available."
+                )
+
+                return
+              }
+
+              try {
+                await localNotifications.schedule({
+                  notifications: [
+                    {
+                      id:
+                        Math.floor(
+                          Date.now() / 1000
+                        ) % 2147483647,
+
+                      title,
+
+                      body,
+
+                      channelId:
+                        "walletiq-default",
+
+                      extra: {
+                        url,
+                      },
+                    },
+                  ],
+                })
+              } catch (error) {
+                console.error(
+                  "WalletIQ foreground local notification error:",
+                  error
+                )
+              }
             }
           )
       })()
@@ -548,7 +613,7 @@ export default function PushNotificationsSettings() {
     }
 
     /* ==============================
-       WEB / PWA
+       WEB / LAPTOP
     ============================== */
 
     let unsubscribe:
@@ -576,23 +641,6 @@ export default function PushNotificationsSettings() {
               payload.data?.body ||
               payload.notification?.body ||
               "You have a new notification."
-
-            /*
-              IMPORTANT:
-
-              Do NOT call
-              registration.showNotification()
-              here.
-
-              Firebase already handles the
-              notification payload.
-
-              Manually calling
-              showNotification() here was
-              causing the laptop/browser to
-              display the same notification
-              twice.
-            */
 
             setMessage(
               `${title}: ${body}`
