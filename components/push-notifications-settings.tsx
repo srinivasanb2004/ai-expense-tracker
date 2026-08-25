@@ -33,33 +33,177 @@ const defaults: Prefs = {
   overdue: true,
 }
 
+/* ========================================
+   NATIVE CAPACITOR HELPERS
+======================================== */
+
+function getNativePushPlugin(): any | null {
+  if (typeof window === "undefined") {
+    return null
+  }
+
+  const capacitor =
+    (window as any).Capacitor
+
+  if (
+    !capacitor ||
+    capacitor?.isNativePlatform?.() !== true ||
+    capacitor?.getPlatform?.() !== "android"
+  ) {
+    return null
+  }
+
+  if (
+    capacitor?.isPluginAvailable?.(
+      "PushNotifications"
+    ) !== true
+  ) {
+    return null
+  }
+
+  return (
+    capacitor?.Plugins
+      ?.PushNotifications || null
+  )
+}
+
+function isNativeAndroid() {
+  return getNativePushPlugin() !== null
+}
+
+/* ========================================
+   GET NATIVE FCM TOKEN
+======================================== */
+
+async function getNativeToken(): Promise<
+  string | null
+> {
+  const push =
+    getNativePushPlugin()
+
+  if (!push) {
+    return null
+  }
+
+  return new Promise<string | null>(
+    async (resolve) => {
+      let finished = false
+      let registrationListener: any
+      let errorListener: any
+      let timeout:
+        | ReturnType<
+            typeof setTimeout
+          >
+        | undefined
+
+      const cleanup =
+        async () => {
+          if (timeout) {
+            clearTimeout(timeout)
+          }
+
+          try {
+            await registrationListener
+              ?.remove?.()
+          } catch {}
+
+          try {
+            await errorListener
+              ?.remove?.()
+          } catch {}
+        }
+
+      const finish =
+        async (
+          value: string | null
+        ) => {
+          if (finished) {
+            return
+          }
+
+          finished = true
+
+          await cleanup()
+
+          resolve(value)
+        }
+
+      try {
+        registrationListener =
+          await push.addListener(
+            "registration",
+            (token: any) => {
+              void finish(
+                token?.value ||
+                  null
+              )
+            }
+          )
+
+        errorListener =
+          await push.addListener(
+            "registrationError",
+            (error: any) => {
+              console.error(
+                "Native push registration error:",
+                error
+              )
+
+              void finish(null)
+            }
+          )
+
+        timeout =
+          setTimeout(
+            () => {
+              void finish(null)
+            },
+            10000
+          )
+
+        await push.register()
+      } catch (error) {
+        console.error(
+          "Native push register error:",
+          error
+        )
+
+        await finish(null)
+      }
+    }
+  )
+}
+
+/* ========================================
+   COMPONENT
+======================================== */
+
 export default function PushNotificationsSettings() {
   const [prefs, setPrefs] =
     useState<Prefs>(defaults)
 
-  /*
-    IMPORTANT:
+  const [
+    deviceEnabled,
+    setDeviceEnabled,
+  ] = useState(false)
 
-    deviceEnabled tells us whether THIS
-    browser/device has an FCM subscription.
+  const [
+    checkingDevice,
+    setCheckingDevice,
+  ] = useState(true)
 
-    It is no longer based on the account-wide
-    PushPreference.enabled value.
-  */
-  const [deviceEnabled, setDeviceEnabled] =
-    useState(false)
-
-  const [checkingDevice, setCheckingDevice] =
-    useState(true)
-
-  const [supported, setSupported] =
-    useState(true)
+  const [
+    supported,
+    setSupported,
+  ] = useState(true)
 
   const [busy, setBusy] =
     useState(false)
 
-  const [message, setMessage] =
-    useState("")
+  const [
+    message,
+    setMessage,
+  ] = useState("")
 
   /* ========================================
      LOAD ACCOUNT PREFERENCES
@@ -72,7 +216,8 @@ export default function PushNotificationsSettings() {
           await fetch(
             "/api/push/preferences",
             {
-              cache: "no-store",
+              cache:
+                "no-store",
             }
           )
 
@@ -85,16 +230,20 @@ export default function PushNotificationsSettings() {
 
         setPrefs({
           recurring:
-            data.recurring !== false,
+            data.recurring !==
+            false,
 
           borrowLend:
-            data.borrowLend !== false,
+            data.borrowLend !==
+            false,
 
           budgets:
-            data.budgets !== false,
+            data.budgets !==
+            false,
 
           overdue:
-            data.overdue !== false,
+            data.overdue !==
+            false,
         })
       } catch (error) {
         console.error(
@@ -104,7 +253,7 @@ export default function PushNotificationsSettings() {
       }
     }
 
-    loadPreferences()
+    void loadPreferences()
   }, [])
 
   /* ========================================
@@ -118,30 +267,110 @@ export default function PushNotificationsSettings() {
       setCheckingDevice(true)
 
       try {
-        if (
-          !("Notification" in window) ||
-          !("serviceWorker" in navigator)
-        ) {
+        /* ==============================
+           NATIVE ANDROID
+        ============================== */
+
+        const nativePush =
+          getNativePushPlugin()
+
+        if (nativePush) {
           if (!cancelled) {
-            setSupported(false)
-            setDeviceEnabled(false)
+            setSupported(true)
+          }
+
+          const permission =
+            await nativePush
+              .checkPermissions()
+
+          if (
+            permission?.receive !==
+            "granted"
+          ) {
+            if (!cancelled) {
+              setDeviceEnabled(
+                false
+              )
+            }
+
+            return
+          }
+
+          const token =
+            await getNativeToken()
+
+          if (!token) {
+            if (!cancelled) {
+              setDeviceEnabled(
+                false
+              )
+            }
+
+            return
+          }
+
+          const response =
+            await fetch(
+              `/api/push/subscription?token=${encodeURIComponent(
+                token
+              )}`,
+              {
+                cache:
+                  "no-store",
+              }
+            )
+
+          const data =
+            response.ok
+              ? await response.json()
+              : {
+                  enabled:
+                    false,
+                }
+
+          if (!cancelled) {
+            setDeviceEnabled(
+              data.enabled ===
+                true
+            )
           }
 
           return
         }
 
-        /*
-          If this browser has never granted
-          notification permission, it cannot
-          currently be registered.
-        */
+        /* ==============================
+           WEB / PWA
+        ============================== */
+
+        if (
+          !(
+            "Notification" in
+            window
+          ) ||
+          !(
+            "serviceWorker" in
+            navigator
+          )
+        ) {
+          if (!cancelled) {
+            setSupported(false)
+            setDeviceEnabled(
+              false
+            )
+          }
+
+          return
+        }
 
         if (
           Notification.permission !==
           "granted"
         ) {
           if (!cancelled) {
-            setDeviceEnabled(false)
+            setSupported(true)
+            setDeviceEnabled(
+              false
+            )
           }
 
           return
@@ -153,16 +382,20 @@ export default function PushNotificationsSettings() {
         if (!messaging) {
           if (!cancelled) {
             setSupported(false)
-            setDeviceEnabled(false)
+            setDeviceEnabled(
+              false
+            )
           }
 
           return
         }
 
         const registration =
-          await navigator.serviceWorker.register(
-            "/firebase-messaging-sw.js"
-          )
+          await navigator
+            .serviceWorker
+            .register(
+              "/firebase-messaging-sw.js"
+            )
 
         const token =
           await getToken(
@@ -175,20 +408,19 @@ export default function PushNotificationsSettings() {
               serviceWorkerRegistration:
                 registration,
             }
-          ).catch(() => null)
+          ).catch(
+            () => null
+          )
 
         if (!token) {
           if (!cancelled) {
-            setDeviceEnabled(false)
+            setDeviceEnabled(
+              false
+            )
           }
 
           return
         }
-
-        /*
-          Ask WalletIQ whether THIS token
-          belongs to THIS logged-in user.
-        */
 
         const response =
           await fetch(
@@ -196,13 +428,16 @@ export default function PushNotificationsSettings() {
               token
             )}`,
             {
-              cache: "no-store",
+              cache:
+                "no-store",
             }
           )
 
         if (!response.ok) {
           if (!cancelled) {
-            setDeviceEnabled(false)
+            setDeviceEnabled(
+              false
+            )
           }
 
           return
@@ -213,7 +448,8 @@ export default function PushNotificationsSettings() {
 
         if (!cancelled) {
           setDeviceEnabled(
-            data.enabled === true
+            data.enabled ===
+              true
           )
         }
       } catch (error) {
@@ -227,12 +463,14 @@ export default function PushNotificationsSettings() {
         }
       } finally {
         if (!cancelled) {
-          setCheckingDevice(false)
+          setCheckingDevice(
+            false
+          )
         }
       }
     }
 
-    checkCurrentDevice()
+    void checkCurrentDevice()
 
     return () => {
       cancelled = true
@@ -240,10 +478,52 @@ export default function PushNotificationsSettings() {
   }, [])
 
   /* ========================================
-     FOREGROUND FCM MESSAGES
+     FOREGROUND NOTIFICATIONS
   ======================================== */
 
   useEffect(() => {
+    const nativePush =
+      getNativePushPlugin()
+
+    /* NATIVE ANDROID */
+
+    if (nativePush) {
+      let listener: any
+
+      ;(async () => {
+        listener =
+          await nativePush
+            .addListener(
+              "pushNotificationReceived",
+              (
+                notification: any
+              ) => {
+                const title =
+                  notification
+                    ?.title ||
+                  "WalletIQ"
+
+                const body =
+                  notification
+                    ?.body ||
+                  "You have a new notification."
+
+                setMessage(
+                  `${title}: ${body}`
+                )
+              }
+            )
+      })()
+
+      return () => {
+        try {
+          void listener?.remove?.()
+        } catch {}
+      }
+    }
+
+    /* WEB */
+
     let unsubscribe:
       | (() => void)
       | undefined
@@ -283,23 +563,16 @@ export default function PushNotificationsSettings() {
                 ?.url ||
               "/dashboard"
 
-            /*
-              Show message inside Settings.
-            */
-
             setMessage(
               `${title}: ${body}`
             )
 
-            /*
-              Also show actual OS/browser
-              notification while WalletIQ
-              is open in foreground.
-            */
-
             if (
-              Notification.permission ===
-              "granted"
+              "Notification" in
+                window &&
+              Notification
+                .permission ===
+                "granted"
             ) {
               try {
                 const registration =
@@ -348,14 +621,59 @@ export default function PushNotificationsSettings() {
   }, [])
 
   /* ========================================
-     SAVE ACCOUNT PREFERENCES
+     NATIVE NOTIFICATION TAP
+  ======================================== */
+
+  useEffect(() => {
+    const nativePush =
+      getNativePushPlugin()
+
+    if (!nativePush) {
+      return
+    }
+
+    let listener: any
+
+    ;(async () => {
+      listener =
+        await nativePush
+          .addListener(
+            "pushNotificationActionPerformed",
+            (
+              action: any
+            ) => {
+              const url =
+                action
+                  ?.notification
+                  ?.data?.url
+
+              if (
+                typeof url ===
+                  "string" &&
+                url.startsWith("/")
+              ) {
+                window.location.href =
+                  url
+              }
+            }
+          )
+    })()
+
+    return () => {
+      try {
+        void listener?.remove?.()
+      } catch {}
+    }
+  }, [])
+
+  /* ========================================
+     SAVE PREFERENCES
   ======================================== */
 
   async function savePreferences(
     next: Prefs
   ) {
-    const previous =
-      prefs
+    const previous = prefs
 
     setPrefs(next)
 
@@ -364,8 +682,7 @@ export default function PushNotificationsSettings() {
         await fetch(
           "/api/push/preferences",
           {
-            method:
-              "PATCH",
+            method: "PATCH",
 
             headers: {
               "Content-Type":
@@ -379,21 +696,13 @@ export default function PushNotificationsSettings() {
           }
         )
 
-      if (
-        !response.ok
-      ) {
+      if (!response.ok) {
         throw new Error(
           "Could not save notification preferences."
         )
       }
     } catch (error) {
-      /*
-        Roll back UI if API fails.
-      */
-
-      setPrefs(
-        previous
-      )
+      setPrefs(previous)
 
       console.error(
         "Push preference error:",
@@ -415,9 +724,106 @@ export default function PushNotificationsSettings() {
     setMessage("")
 
     try {
+      const nativePush =
+        getNativePushPlugin()
+
+      /* ==============================
+         NATIVE ANDROID
+      ============================== */
+
+      if (nativePush) {
+        let permission =
+          await nativePush
+            .checkPermissions()
+
+        if (
+          permission?.receive !==
+          "granted"
+        ) {
+          permission =
+            await nativePush
+              .requestPermissions()
+        }
+
+        if (
+          permission?.receive !==
+          "granted"
+        ) {
+          throw new Error(
+            "Notification permission was not granted."
+          )
+        }
+
+        const token =
+          await getNativeToken()
+
+        if (!token) {
+          throw new Error(
+            "Could not create an Android push token."
+          )
+        }
+
+        const response =
+          await fetch(
+            "/api/push/subscription",
+            {
+              method: "POST",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+
+              body:
+                JSON.stringify({
+                  token,
+
+                  userAgent:
+                    `WalletIQ Android | ${navigator.userAgent}`,
+                }),
+            }
+          )
+
+        const data =
+          await response
+            .json()
+            .catch(
+              () => ({})
+            )
+
+        if (!response.ok) {
+          throw new Error(
+            data.error ||
+              "Could not save this Android device."
+          )
+        }
+
+        setSupported(true)
+
+        setDeviceEnabled(
+          true
+        )
+
+        setMessage(
+          "Push notifications enabled on this Android device."
+        )
+
+        return
+      }
+
+      /* ==============================
+         WEB / PWA
+      ============================== */
+
       if (
-        !("Notification" in window) ||
-        !("serviceWorker" in navigator)
+        !(
+          "Notification" in
+          window
+        ) ||
+        !(
+          "serviceWorker" in
+          navigator
+        )
       ) {
         throw new Error(
           "Push notifications are not supported in this browser."
@@ -476,8 +882,7 @@ export default function PushNotificationsSettings() {
         await fetch(
           "/api/push/subscription",
           {
-            method:
-              "POST",
+            method: "POST",
 
             headers: {
               "Content-Type":
@@ -485,15 +890,13 @@ export default function PushNotificationsSettings() {
             },
 
             body:
-              JSON.stringify(
-                {
-                  token,
+              JSON.stringify({
+                token,
 
-                  userAgent:
-                    navigator
-                      .userAgent,
-                }
-              ),
+                userAgent:
+                  navigator
+                    .userAgent,
+              }),
           }
         )
 
@@ -504,41 +907,30 @@ export default function PushNotificationsSettings() {
             () => ({})
           )
 
-      if (
-        !response.ok
-      ) {
+      if (!response.ok) {
         throw new Error(
           data.error ||
             "Could not save this device."
         )
       }
 
-      /*
-        Only THIS device becomes enabled.
-      */
+      setSupported(true)
 
-      setDeviceEnabled(
-        true
-      )
+      setDeviceEnabled(true)
 
       setMessage(
         "Push notifications enabled on this device."
       )
-    } catch (
-      error: any
-    ) {
+    } catch (error) {
       console.error(
         "Enable push error:",
         error
       )
 
-      setDeviceEnabled(
-        false
-      )
-
       setMessage(
-        error?.message ||
-          "Could not enable push notifications."
+        error instanceof Error
+          ? error.message
+          : "Could not enable push notifications."
       )
     } finally {
       setBusy(false)
@@ -554,6 +946,68 @@ export default function PushNotificationsSettings() {
     setMessage("")
 
     try {
+      const nativePush =
+        getNativePushPlugin()
+
+      /* ==============================
+         NATIVE ANDROID
+      ============================== */
+
+      if (nativePush) {
+        const token =
+          await getNativeToken()
+
+        if (!token) {
+          throw new Error(
+            "Could not identify this Android device."
+          )
+        }
+
+        const response =
+          await fetch(
+            "/api/push/subscription",
+            {
+              method: "DELETE",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+
+              body:
+                JSON.stringify({
+                  token,
+                }),
+            }
+          )
+
+        const data =
+          await response
+            .json()
+            .catch(
+              () => ({})
+            )
+
+        if (!response.ok) {
+          throw new Error(
+            data.error ||
+              "Could not remove this Android device."
+          )
+        }
+
+        setDeviceEnabled(false)
+
+        setMessage(
+          "Push notifications disabled on this Android device."
+        )
+
+        return
+      }
+
+      /* ==============================
+         WEB / PWA
+      ============================== */
+
       const messaging =
         await browserMessaging()
 
@@ -563,8 +1017,7 @@ export default function PushNotificationsSettings() {
             .serviceWorker
             .ready
             .catch(
-              () =>
-                undefined
+              () => undefined
             )
 
         const token =
@@ -583,8 +1036,7 @@ export default function PushNotificationsSettings() {
                 : {}),
             }
           ).catch(
-            () =>
-              null
+            () => null
           )
 
         if (token) {
@@ -601,39 +1053,27 @@ export default function PushNotificationsSettings() {
                 },
 
                 body:
-                  JSON.stringify(
-                    {
-                      token,
-                    }
-                  ),
+                  JSON.stringify({
+                    token,
+                  }),
               }
             )
 
-          if (
-            !response.ok
-          ) {
+          if (!response.ok) {
             throw new Error(
               "Could not remove this device."
             )
           }
         }
 
-        /*
-          Delete Firebase token from
-          THIS browser.
-        */
-
         await deleteToken(
           messaging
         ).catch(
-          () =>
-            false
+          () => false
         )
       }
 
-      setDeviceEnabled(
-        false
-      )
+      setDeviceEnabled(false)
 
       setMessage(
         "Push notifications disabled on this device."
@@ -645,7 +1085,9 @@ export default function PushNotificationsSettings() {
       )
 
       setMessage(
-        "Could not disable push notifications on this device."
+        error instanceof Error
+          ? error.message
+          : "Could not disable push notifications on this device."
       )
     } finally {
       setBusy(false)
@@ -665,8 +1107,7 @@ export default function PushNotificationsSettings() {
         await fetch(
           "/api/push/test",
           {
-            method:
-              "POST",
+            method: "POST",
           }
         )
 
@@ -677,9 +1118,7 @@ export default function PushNotificationsSettings() {
             () => ({})
           )
 
-      if (
-        !response.ok
-      ) {
+      if (!response.ok) {
         throw new Error(
           data.error ||
             "Test notification failed."
@@ -689,17 +1128,16 @@ export default function PushNotificationsSettings() {
       setMessage(
         "Test notification sent. Check your registered devices."
       )
-    } catch (
-      error: any
-    ) {
+    } catch (error) {
       console.error(
         "Test notification error:",
         error
       )
 
       setMessage(
-        error?.message ||
-          "Test notification failed."
+        error instanceof Error
+          ? error.message
+          : "Test notification failed."
       )
     } finally {
       setBusy(false)
@@ -707,23 +1145,23 @@ export default function PushNotificationsSettings() {
   }
 
   /* ========================================
-     TOGGLE ACCOUNT PREFERENCE
+     TOGGLE PREFERENCE
   ======================================== */
 
   function toggle(
-    key:
-      keyof Prefs
+    key: keyof Prefs
   ) {
-    void savePreferences(
-      {
-        ...prefs,
-        [key]:
-          !prefs[
-            key
-          ],
-      }
-    )
+    void savePreferences({
+      ...prefs,
+
+      [key]:
+        !prefs[key],
+    })
   }
+
+  /* ========================================
+     UI
+  ======================================== */
 
   return (
     <div className="soft-panel mt-8">
@@ -752,9 +1190,9 @@ export default function PushNotificationsSettings() {
           </h3>
 
           <p className="mt-1 text-sm muted">
-            Get WalletIQ
-            reminders even when
-            the app is not open.
+            Get WalletIQ reminders
+            even when the app is not
+            open.
           </p>
         </div>
       </div>
@@ -767,9 +1205,9 @@ export default function PushNotificationsSettings() {
               "var(--line)",
           }}
         >
-          Push notifications
-          are not supported by
-          this browser/device.
+          Push notifications are not
+          supported by this
+          browser/device.
         </p>
       ) : (
         <>
@@ -795,8 +1233,12 @@ export default function PushNotificationsSettings() {
                   {checkingDevice
                     ? "Checking notification status..."
                     : deviceEnabled
-                      ? "Push notifications are enabled on this browser."
-                      : "Push notifications are not enabled on this browser."}
+                      ? isNativeAndroid()
+                        ? "Push notifications are enabled on this Android device."
+                        : "Push notifications are enabled on this browser."
+                      : isNativeAndroid()
+                        ? "Push notifications are not enabled on this Android device."
+                        : "Push notifications are not enabled on this browser."}
                 </p>
               </div>
 
@@ -827,32 +1269,21 @@ export default function PushNotificationsSettings() {
             ) : deviceEnabled ? (
               <button
                 type="button"
-                disabled={
-                  busy
-                }
-                onClick={
-                  disable
-                }
+                disabled={busy}
+                onClick={disable}
                 className="btn btn-secondary"
               >
-                Disable on this
-                device
+                Disable on this device
               </button>
             ) : (
               <button
                 type="button"
-                disabled={
-                  busy
-                }
-                onClick={
-                  enable
-                }
+                disabled={busy}
+                onClick={enable}
                 className="btn btn-primary"
               >
                 <Smartphone
-                  size={
-                    17
-                  }
+                  size={17}
                 />
 
                 {busy
@@ -868,34 +1299,25 @@ export default function PushNotificationsSettings() {
                 checkingDevice ||
                 !deviceEnabled
               }
-              onClick={
-                test
-              }
+              onClick={test}
               className="btn btn-secondary"
             >
-              <Send
-                size={
-                  16
-                }
-              />
-
+              <Send size={16} />
               Send test
             </button>
           </div>
 
-          {/* ACCOUNT PREFERENCES */}
+          {/* PREFERENCES */}
 
           <div className="mt-6">
             <p className="text-xs font-black uppercase tracking-[.14em] muted">
-              Notification
-              preferences
+              Notification preferences
             </p>
 
             <p className="mt-1 text-xs muted">
-              These preferences
-              are shared across
-              all devices signed
-              in to this account.
+              These preferences are
+              shared across all devices
+              signed in to this account.
             </p>
           </div>
 
@@ -928,9 +1350,7 @@ export default function PushNotificationsSettings() {
                 label,
               ]) => (
                 <label
-                  key={
-                    key
-                  }
+                  key={key}
                   className="flex items-center justify-between gap-3 rounded-xl border p-3 text-sm font-bold"
                   style={{
                     borderColor:
@@ -941,22 +1361,16 @@ export default function PushNotificationsSettings() {
                   }}
                 >
                   <span>
-                    {
-                      label
-                    }
+                    {label}
                   </span>
 
                   <input
                     type="checkbox"
                     checked={
-                      prefs[
-                        key
-                      ]
+                      prefs[key]
                     }
                     onChange={() =>
-                      toggle(
-                        key
-                      )
+                      toggle(key)
                     }
                   />
                 </label>
@@ -965,8 +1379,6 @@ export default function PushNotificationsSettings() {
           </div>
         </>
       )}
-
-      {/* STATUS */}
 
       {message && (
         <p className="mt-4 text-xs muted">
