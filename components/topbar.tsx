@@ -381,7 +381,7 @@ export default function Topbar() {
 
   return (
     <header
-      className="sticky top-0 z-30 flex h-[72px] w-full min-w-0 items-center justify-between gap-1.5 border-b px-2.5 backdrop-blur-xl sm:gap-2 sm:px-3 md:h-20 md:px-8"
+      className="walletiq-topbar sticky top-0 z-30 flex w-full min-w-0 items-center justify-between gap-1.5 border-b px-2.5 backdrop-blur-xl sm:gap-2 sm:px-3 md:px-8"
       style={{
         background:
           "color-mix(in srgb, var(--bg) 88%, transparent)",

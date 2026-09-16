@@ -105,7 +105,20 @@ html.light .notification-item:hover { background:rgba(5,150,105,.06); }
 
 @media(max-width:390px){
   .brand-mark{width:34px;height:34px;border-radius:12px}
-  .notification-popover{top:68px!important}
+  .notification-popover{top:calc(68px + env(safe-area-inset-top, 0px))!important}
+}
+
+.walletiq-topbar {
+  height: calc(72px + env(safe-area-inset-top, 0px));
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+@media (min-width: 768px) {
+  .walletiq-topbar { height: 80px; padding-top: 0; }
+}
+
+@media (max-width: 767px) {
+  .notification-popover { top: calc(72px + env(safe-area-inset-top, 0px)) !important; }
 }
 
 
