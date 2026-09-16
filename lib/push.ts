@@ -118,6 +118,7 @@ export async function deliverNotificationPush(
     await prisma.notification.findFirst({
       where: {
         id: notificationId,
+        cleared: false,
         userId,
       },
     })
@@ -359,6 +360,7 @@ export async function deliverPendingPushes(
     await prisma.notification.findMany({
       where: {
         userId,
+        cleared: false,
 
         createdAt: {
           gte: since,

@@ -158,7 +158,7 @@ async function createOnce(
     )
 
   if (existing) {
-    return existing
+    return null
   }
 
   return prisma.notification.create(
@@ -408,6 +408,7 @@ export async function syncBudgetNotifications(
 
             createdAt: {
               gte: start,
+              lt: end,
             },
           },
         }
@@ -580,9 +581,7 @@ export async function syncRecurringReminders(
           }
         )
 
-      notificationIds.push(
-        notification.id
-      )
+      if (notification) notificationIds.push(notification.id)
 
       continue
     }
@@ -609,9 +608,7 @@ export async function syncRecurringReminders(
           }
         )
 
-      notificationIds.push(
-        notification.id
-      )
+      if (notification) notificationIds.push(notification.id)
 
       continue
     }
@@ -644,9 +641,7 @@ export async function syncRecurringReminders(
         }
       )
 
-    notificationIds.push(
-      notification.id
-    )
+    if (notification) notificationIds.push(notification.id)
   }
 
   return notificationIds
@@ -1217,9 +1212,7 @@ export async function syncBorrowLendNotifications(
         }
       )
 
-    notificationIds.push(
-      notification.id
-    )
+    if (notification) notificationIds.push(notification.id)
   }
 
   return notificationIds

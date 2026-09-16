@@ -62,8 +62,10 @@ export default function Topbar() {
 
   const calculatorBox =
     useRef<HTMLDivElement>(null)
+  const notificationVersion = useRef(0)
 
   async function loadNotifications() {
+    const version = notificationVersion.current
     const response =
       await fetch(
         "/api/notifications",
@@ -79,6 +81,8 @@ export default function Topbar() {
     const data =
       await response.json()
 
+    if (version !== notificationVersion.current) return
+
     setItems(
       data.notifications || []
     )
@@ -93,11 +97,13 @@ export default function Topbar() {
       void loadNotifications()
     }, 800)
     const onPush = () => void loadNotifications()
+    const onChanged = () => void loadNotifications()
     const onVisible = () => {
       if (document.visibilityState === "visible") void loadNotifications()
     }
     const poll = window.setInterval(onVisible, 60_000)
     window.addEventListener("walletiq:push", onPush)
+    window.addEventListener("walletiq:notifications-changed", onChanged)
     document.addEventListener("visibilitychange", onVisible)
 
     const savedTheme =
@@ -120,6 +126,7 @@ export default function Topbar() {
       window.clearTimeout(timer)
       window.clearInterval(poll)
       window.removeEventListener("walletiq:push", onPush)
+      window.removeEventListener("walletiq:notifications-changed", onChanged)
       document.removeEventListener("visibilitychange", onVisible)
     }
   }, [])
@@ -153,12 +160,14 @@ export default function Topbar() {
     setRefreshing(true)
 
     try {
-      await fetch(
+      const response = await fetch(
         "/api/notifications",
         {
           method: "POST",
         }
       )
+
+      if (!response.ok) throw new Error("Notification refresh failed")
 
       await loadNotifications()
     } catch (error) {
@@ -183,7 +192,7 @@ export default function Topbar() {
       return
     }
 
-    await refreshNotifications()
+    void loadNotifications()
   }
 
   useEffect(() => {
@@ -240,61 +249,82 @@ export default function Topbar() {
   }, [])
 
   async function markAllRead() {
-    await fetch(
-      "/api/notifications",
-      {
-        method: "PATCH",
+    notificationVersion.current++
+    setItems((current) => current.map((item) => ({ ...item, read: true })))
+    setUnread(0)
+    try {
+      const response = await fetch(
+        "/api/notifications",
+        {
+          method: "PATCH",
 
-        headers: {
-          "Content-Type":
-            "application/json",
-        },
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
 
-        body:
-          JSON.stringify({}),
-      }
-    )
+          body:
+            JSON.stringify({}),
+        }
+      )
 
-    await loadNotifications()
+      if (!response.ok) throw new Error("Could not mark notifications read")
+      window.dispatchEvent(new Event("walletiq:notifications-changed"))
+    } catch {
+      void loadNotifications()
+    }
   }
 
   async function markRead(
     id: string
   ) {
-    await fetch(
-      "/api/notifications",
-      {
-        method: "PATCH",
+    notificationVersion.current++
+    const wasUnread = items.some((item) => item.id === id && !item.read)
+    setItems((current) => current.map((item) => item.id === id ? { ...item, read: true } : item))
+    if (wasUnread) setUnread((current) => Math.max(0, current - 1))
+    try {
+      const response = await fetch(
+        "/api/notifications",
+        {
+          method: "PATCH",
 
-        headers: {
-          "Content-Type":
-            "application/json",
-        },
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
 
-        body:
-          JSON.stringify({
-            id,
-          }),
-      }
-    )
+          body:
+            JSON.stringify({
+              id,
+            }),
+        }
+      )
 
-    await loadNotifications()
+      if (!response.ok) throw new Error("Could not mark notification read")
+      window.dispatchEvent(new Event("walletiq:notifications-changed"))
+    } catch {
+      void loadNotifications()
+    }
   }
 
   async function clearAllNotifications() {
     if (!items.length) return
 
-    const response = await fetch(
-      "/api/notifications",
-      { method: "DELETE" }
-    )
-
-    if (!response.ok) {
-      return
-    }
-
+    notificationVersion.current++
     setItems([])
     setUnread(0)
+
+    try {
+      const response = await fetch(
+        "/api/notifications",
+        { method: "DELETE" }
+      )
+
+      if (!response.ok) throw new Error("Could not clear notifications")
+      window.dispatchEvent(new Event("walletiq:notifications-changed"))
+    } catch {
+      void loadNotifications()
+    }
   }
 
 

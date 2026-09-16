@@ -102,10 +102,12 @@ model Notification {
   title     String
   body      String
   read      Boolean  @default(false)
+  cleared   Boolean  @default(false)
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
+  @@index([userId, cleared, read])
 }
 
 model BorrowLend {

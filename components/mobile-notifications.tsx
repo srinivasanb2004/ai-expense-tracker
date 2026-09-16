@@ -1,7 +1,7 @@
 "use client"
 
 import { Bell, CheckCheck, Trash2 } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 type NotificationItem = {
   id: string
@@ -14,46 +14,84 @@ type NotificationItem = {
 export default function MobileNotifications() {
   const [items, setItems] = useState<NotificationItem[]>([])
   const [unread, setUnread] = useState(0)
+  const version = useRef(0)
 
   async function load() {
+    const requestVersion = version.current
     const response = await fetch("/api/notifications", { cache: "no-store" })
     if (!response.ok) return
     const data = await response.json()
+    if (requestVersion !== version.current) return
     setItems(data.notifications || [])
     setUnread(data.unread || 0)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    void load()
+    const onChange = () => void load()
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void load()
+    }
+    window.addEventListener("walletiq:push", onChange)
+    window.addEventListener("walletiq:notifications-changed", onChange)
+    document.addEventListener("visibilitychange", onVisible)
+    return () => {
+      window.removeEventListener("walletiq:push", onChange)
+      window.removeEventListener("walletiq:notifications-changed", onChange)
+      document.removeEventListener("visibilitychange", onVisible)
+    }
+  }, [])
 
   async function markAll() {
-    await fetch("/api/notifications", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
-    })
-    await load()
+    version.current++
+    setItems((current) => current.map((item) => ({ ...item, read: true })))
+    setUnread(0)
+    try {
+      const response = await fetch("/api/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      })
+      if (!response.ok) throw new Error("Could not mark notifications read")
+      window.dispatchEvent(new Event("walletiq:notifications-changed"))
+    } catch {
+      void load()
+    }
   }
 
   async function read(id: string) {
-    await fetch("/api/notifications", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
-    })
-    await load()
+    version.current++
+    const wasUnread = items.some((item) => item.id === id && !item.read)
+    setItems((current) => current.map((item) => item.id === id ? { ...item, read: true } : item))
+    if (wasUnread) setUnread((current) => Math.max(0, current - 1))
+    try {
+      const response = await fetch("/api/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      })
+      if (!response.ok) throw new Error("Could not mark notification read")
+      window.dispatchEvent(new Event("walletiq:notifications-changed"))
+    } catch {
+      void load()
+    }
   }
 
   async function clearAll() {
     if (!items.length) return
-
-    const response = await fetch("/api/notifications", {
-      method: "DELETE",
-    })
-
-    if (!response.ok) return
-
+    version.current++
     setItems([])
     setUnread(0)
+    try {
+      const response = await fetch("/api/notifications", {
+        method: "DELETE",
+      })
+
+      if (!response.ok) throw new Error("Could not clear notifications")
+      window.dispatchEvent(new Event("walletiq:notifications-changed"))
+    } catch {
+      void load()
+    }
   }
 
   return (

@@ -31,6 +31,7 @@ export async function GET() {
       prisma.notification.findMany({
         where: {
           userId,
+          cleared: false,
         },
         orderBy: {
           createdAt: "desc",
@@ -42,6 +43,7 @@ export async function GET() {
         where: {
           userId,
           read: false,
+          cleared: false,
         },
       }),
     ])
@@ -121,6 +123,7 @@ export async function PATCH(req: Request) {
         where: {
           id: String(body.id),
           userId,
+          cleared: false,
         },
         data: {
           read: true,
@@ -131,6 +134,7 @@ export async function PATCH(req: Request) {
         where: {
           userId,
           read: false,
+          cleared: false,
         },
         data: {
           read: true,
@@ -161,8 +165,7 @@ export async function PATCH(req: Request) {
 
 /*
   DELETE
-  Clear all in-app notifications for the current user.
-  Push subscriptions/preferences are intentionally untouched.
+  Hide existing notifications while retaining their deduplication history.
 */
 export async function DELETE() {
   try {
@@ -175,26 +178,10 @@ export async function DELETE() {
       )
     }
 
-    const notifications = await prisma.notification.findMany({
-      where: { userId },
-      select: { id: true },
+    await prisma.notification.updateMany({
+      where: { userId, cleared: false },
+      data: { cleared: true, read: true },
     })
-
-    const notificationIds = notifications.map((item) => item.id)
-
-    await prisma.$transaction([
-      prisma.pushDelivery.deleteMany({
-        where: {
-          userId,
-          ...(notificationIds.length
-            ? { notificationId: { in: notificationIds } }
-            : {}),
-        },
-      }),
-      prisma.notification.deleteMany({
-        where: { userId },
-      }),
-    ])
 
     return NextResponse.json({
       success: true,
