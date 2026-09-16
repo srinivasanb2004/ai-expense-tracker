@@ -59,11 +59,6 @@ export default async function Dashboard() {
     year: "numeric",
   })
 
-  let expenseTotals: {
-    _sum: {
-      amount: Prisma.Decimal | null
-    }
-  } | null = null
   let incomeTotals: {
     _sum: {
       amount: Prisma.Decimal | null
@@ -88,32 +83,21 @@ export default async function Dashboard() {
   }[] = []
   let repayments: {
     borrowLendId: string
-    amount: Prisma.Decimal
+    _sum: {
+      amount: Prisma.Decimal | null
+    }
   }[] = []
 
   try {
     ;[
-      expenseTotals,
       incomeTotals,
       budgetTotals,
       categoryTotals,
       recent,
       activeBorrowLend,
+      repayments,
     ] =
       await Promise.all([
-        prisma.expense.aggregate({
-          where: {
-            userId,
-            date: {
-              gte: start,
-              lt: end,
-            },
-          },
-          _sum: {
-            amount: true,
-          },
-        }),
-
         prisma.income.aggregate({
           where: {
             userId,
@@ -155,7 +139,6 @@ export default async function Dashboard() {
               amount: "desc",
             },
           },
-          take: 1,
         }),
 
         prisma.expense.findMany({
@@ -183,24 +166,17 @@ export default async function Dashboard() {
             amount: true,
           },
         }),
-      ])
-
-    if (activeBorrowLend.length) {
-      repayments =
-        await prisma.borrowLendRepayment.findMany({
+        prisma.borrowLendRepayment.groupBy({
+          by: ["borrowLendId"],
           where: {
-            borrowLendId: {
-              in: activeBorrowLend.map(
-                (item) => item.id
-              ),
+            borrowLend: {
+              userId,
+              status: { not: "SETTLED" },
             },
           },
-          select: {
-            borrowLendId: true,
-            amount: true,
-          },
-        })
-    }
+          _sum: { amount: true },
+        }),
+      ])
   } catch (error) {
     console.error(
       "Dashboard database connection error:",
@@ -246,8 +222,11 @@ export default async function Dashboard() {
     )
   }
 
-  const spent = decimalToNumber(
-    expenseTotals?._sum.amount
+  const spent = Number(
+    categoryTotals.reduce(
+      (total, category) => total.add(category._sum.amount ?? 0),
+      new Prisma.Decimal(0)
+    )
   )
 
   const income = decimalToNumber(
@@ -270,7 +249,7 @@ export default async function Dashboard() {
       totals.set(
         item.borrowLendId,
         (totals.get(item.borrowLendId) || 0) +
-          Number(item.amount)
+          decimalToNumber(item._sum.amount)
       )
 
       return totals
