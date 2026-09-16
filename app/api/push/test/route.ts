@@ -43,6 +43,9 @@ export async function POST() {
 
     let sent = 0
     let failed = 0
+    const appUrl =
+      process.env.NEXTAUTH_URL ||
+      "https://ai-expense-tracker-sage-seven.vercel.app"
 
     const errors: {
       device: string
@@ -112,7 +115,7 @@ export async function POST() {
 
             fcmOptions: {
               link:
-                "https://ai-expense-tracker-sage-seven.vercel.app/settings",
+                `${appUrl}/settings`,
             },
           },
         })

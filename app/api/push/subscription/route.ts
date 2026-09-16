@@ -140,66 +140,6 @@ export async function POST(
         : null
 
     /*
-      Keep only one current FCM token for this exact device/browser
-      identity. Firebase can rotate tokens over time; without cleanup,
-      stale tokens for the same browser can make WalletIQ deliver the
-      same notification more than once.
-    */
-
-    if (userAgentValue) {
-      const isAndroidApp =
-        userAgentValue.startsWith("WalletIQ Android |")
-
-      const staleSubscriptions =
-        await prisma.pushSubscription.findMany({
-          where: {
-            userId,
-            token: {
-              not: tokenValue,
-            },
-            ...(isAndroidApp
-              ? { userAgent: userAgentValue }
-              : {
-                  OR: [
-                    { userAgent: userAgentValue },
-                    {
-                      userAgent: {
-                        not: { startsWith: "WalletIQ Android |" },
-                      },
-                    },
-                    { userAgent: null },
-                  ],
-                }),
-          },
-          select: {
-            id: true,
-          },
-        })
-
-      if (staleSubscriptions.length) {
-        const staleIds =
-          staleSubscriptions.map((item) => item.id)
-
-        await prisma.$transaction([
-          prisma.pushDelivery.deleteMany({
-            where: {
-              subscriptionId: {
-                in: staleIds,
-              },
-            },
-          }),
-          prisma.pushSubscription.deleteMany({
-            where: {
-              id: {
-                in: staleIds,
-              },
-            },
-          }),
-        ])
-      }
-    }
-
-    /*
       FCM token is globally unique.
 
       If the same browser was previously

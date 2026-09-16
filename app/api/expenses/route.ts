@@ -220,10 +220,16 @@ export async function POST(
           body.source ===
           "receipt_scan"
         ) {
-          await createReceiptSavedNotification(
+          const notification =
+            await createReceiptSavedNotification(
+              userId,
+              expense.merchant,
+              amount
+            )
+
+          await deliverNotificationPushes(
             userId,
-            expense.merchant,
-            amount
+            [notification.id]
           )
         }
 

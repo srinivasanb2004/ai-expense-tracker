@@ -17,6 +17,7 @@ import {
 } from "lucide-react"
 import Greeting from "@/components/greeting"
 import Link from "next/link"
+import { Prisma } from "@prisma/client"
 
 function money(value: number) {
   return new Intl.NumberFormat("en-IN", {
@@ -24,6 +25,10 @@ function money(value: number) {
     currency: "INR",
     maximumFractionDigits: 0,
   }).format(value)
+}
+
+function decimalToNumber(value: Prisma.Decimal | null | undefined) {
+  return value ? Number(value) : 0
 }
 
 export default async function Dashboard() {
@@ -54,16 +59,49 @@ export default async function Dashboard() {
     year: "numeric",
   })
 
-  let expenses: any[] = []
-  let incomes: any[] = []
-  let budgets: any[] = []
+  let expenseTotals: {
+    _sum: {
+      amount: Prisma.Decimal | null
+    }
+  } | null = null
+  let incomeTotals: {
+    _sum: {
+      amount: Prisma.Decimal | null
+    }
+  } | null = null
+  let budgetTotals: {
+    _sum: {
+      amount: Prisma.Decimal | null
+    }
+  } | null = null
+  let categoryTotals: {
+    category: string
+    _sum: {
+      amount: Prisma.Decimal | null
+    }
+  }[] = []
   let recent: any[] = []
-  let borrowLend: any[] = []
+  let activeBorrowLend: {
+    id: string
+    type: string
+    amount: Prisma.Decimal
+  }[] = []
+  let repayments: {
+    borrowLendId: string
+    amount: Prisma.Decimal
+  }[] = []
 
   try {
-    ;[expenses, incomes, budgets, recent, borrowLend] =
+    ;[
+      expenseTotals,
+      incomeTotals,
+      budgetTotals,
+      categoryTotals,
+      recent,
+      activeBorrowLend,
+    ] =
       await Promise.all([
-        prisma.expense.findMany({
+        prisma.expense.aggregate({
           where: {
             userId,
             date: {
@@ -71,13 +109,12 @@ export default async function Dashboard() {
               lt: end,
             },
           },
-          select: {
+          _sum: {
             amount: true,
-            category: true,
           },
         }),
 
-        prisma.income.findMany({
+        prisma.income.aggregate({
           where: {
             userId,
             date: {
@@ -85,20 +122,40 @@ export default async function Dashboard() {
               lt: end,
             },
           },
-          select: {
+          _sum: {
             amount: true,
           },
         }),
 
-        prisma.budget.findMany({
+        prisma.budget.aggregate({
           where: {
             userId,
             month: now.getMonth() + 1,
             year: now.getFullYear(),
           },
-          select: {
+          _sum: {
             amount: true,
           },
+        }),
+
+        prisma.expense.groupBy({
+          by: ["category"],
+          where: {
+            userId,
+            date: {
+              gte: start,
+              lt: end,
+            },
+          },
+          _sum: {
+            amount: true,
+          },
+          orderBy: {
+            _sum: {
+              amount: "desc",
+            },
+          },
+          take: 1,
         }),
 
         prisma.expense.findMany({
@@ -121,14 +178,29 @@ export default async function Dashboard() {
         prisma.borrowLend.findMany({
           where: { userId, status: { not: "SETTLED" } },
           select: {
+            id: true,
             type: true,
             amount: true,
-            repayments: {
-              select: { amount: true },
-            },
           },
         }),
       ])
+
+    if (activeBorrowLend.length) {
+      repayments =
+        await prisma.borrowLendRepayment.findMany({
+          where: {
+            borrowLendId: {
+              in: activeBorrowLend.map(
+                (item) => item.id
+              ),
+            },
+          },
+          select: {
+            borrowLendId: true,
+            amount: true,
+          },
+        })
+    }
   } catch (error) {
     console.error(
       "Dashboard database connection error:",
@@ -174,24 +246,18 @@ export default async function Dashboard() {
     )
   }
 
-  const spent = expenses.reduce(
-    (sum, item) =>
-      sum + Number(item.amount),
-    0
+  const spent = decimalToNumber(
+    expenseTotals?._sum.amount
   )
 
-  const income = incomes.reduce(
-    (sum, item) =>
-      sum + Number(item.amount),
-    0
+  const income = decimalToNumber(
+    incomeTotals?._sum.amount
   )
 
   const remaining = income - spent
 
-  const budget = budgets.reduce(
-    (sum, item) =>
-      sum + Number(item.amount),
-    0
+  const budget = decimalToNumber(
+    budgetTotals?._sum.amount
   )
 
   const budgetUsed =
@@ -199,27 +265,53 @@ export default async function Dashboard() {
       ? Math.min((spent / budget) * 100, 100)
       : 0
 
+  const repaymentByRecord = repayments.reduce(
+    (totals, item) => {
+      totals.set(
+        item.borrowLendId,
+        (totals.get(item.borrowLendId) || 0) +
+          Number(item.amount)
+      )
 
-  const youOwe = borrowLend.filter((x) => x.type === "BORROWED").reduce((sum, x) => {
-    const paid=x.repayments.reduce((s:number,r:any)=>s+Number(r.amount),0)
-    return sum + Math.max(Number(x.amount)-paid,0)
-  },0)
-  const owedToYou = borrowLend.filter((x) => x.type === "LENT").reduce((sum, x) => {
-    const paid=x.repayments.reduce((s:number,r:any)=>s+Number(r.amount),0)
-    return sum + Math.max(Number(x.amount)-paid,0)
-  },0)
+      return totals
+    },
+    new Map<string, number>()
+  )
 
-  const cats: Record<string, number> = {}
+  const borrowTotals =
+    activeBorrowLend.reduce(
+      (totals, item) => {
+        const paid =
+          repaymentByRecord.get(item.id) || 0
+        const remainingAmount = Math.max(
+          Number(item.amount) - paid,
+          0
+        )
 
-  expenses.forEach((item) => {
-    cats[item.category] =
-      (cats[item.category] || 0) +
-      Number(item.amount)
-  })
+        if (item.type === "BORROWED") {
+          totals.youOwe += remainingAmount
+        } else if (item.type === "LENT") {
+          totals.owedToYou += remainingAmount
+        }
 
-  const top = Object.entries(cats).sort(
-    (a, b) => b[1] - a[1]
-  )[0]
+        return totals
+      },
+      {
+        youOwe: 0,
+        owedToYou: 0,
+      }
+    )
+
+  const youOwe = borrowTotals.youOwe
+  const owedToYou = borrowTotals.owedToYou
+
+  const topCategory = categoryTotals[0]
+  const top = topCategory
+    ? [
+        topCategory.category,
+        decimalToNumber(topCategory._sum.amount),
+      ] as const
+    : null
 
   return (
     <AppShell>

@@ -1,0 +1,18 @@
+{
+  "name": "WalletIQ",
+  "short_name": "WalletIQ",
+  "description": "Personal finance and expense tracking",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#101b1a",
+  "theme_color": "#101b1a",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

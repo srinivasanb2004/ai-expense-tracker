@@ -119,6 +119,7 @@ export async function POST(req: Request) {
       `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
       {
         method: "POST",
+        signal: AbortSignal.timeout(25000),
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [

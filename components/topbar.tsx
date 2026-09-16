@@ -89,7 +89,16 @@ export default function Topbar() {
   }
 
   useEffect(() => {
-    loadNotifications()
+    const timer = window.setTimeout(() => {
+      void loadNotifications()
+    }, 800)
+    const onPush = () => void loadNotifications()
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void loadNotifications()
+    }
+    const poll = window.setInterval(onVisible, 60_000)
+    window.addEventListener("walletiq:push", onPush)
+    document.addEventListener("visibilitychange", onVisible)
 
     const savedTheme =
       (localStorage.getItem("theme") as
@@ -106,6 +115,13 @@ export default function Topbar() {
     document.documentElement.classList.add(
       savedTheme
     )
+
+    return () => {
+      window.clearTimeout(timer)
+      window.clearInterval(poll)
+      window.removeEventListener("walletiq:push", onPush)
+      document.removeEventListener("visibilitychange", onVisible)
+    }
   }, [])
 
   function toggleTheme() {

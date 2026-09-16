@@ -25,7 +25,10 @@ export async function PATCH(
     const { id } = await params
     const body = await req.json().catch(() => ({}))
 
-    const existing = await prisma.note.findFirst({ where: { id, userId } })
+    const existing = await prisma.note.findFirst({
+      where: { id, userId },
+      include: { items: { orderBy: { position: "asc" } } },
+    })
     if (!existing) return NextResponse.json({ error: "Note not found." }, { status: 404 })
 
     const data: any = {}
@@ -36,20 +39,30 @@ export async function PATCH(
     if (typeof body.color === "string") data.color = body.color
     if (Array.isArray(body.tags)) data.tags = body.tags.map((tag: unknown) => String(tag).trim()).filter(Boolean).slice(0, 8)
 
-    if (Array.isArray(body.items)) {
+    const nextItems = Array.isArray(body.items)
+      ? body.items.map((item: any) => ({
+          text: String(item?.text || "").trim(),
+          checked: Boolean(item?.checked),
+        })).filter((item: { text: string }) => item.text)
+      : null
+    const itemsChanged = nextItems !== null &&
+      JSON.stringify(nextItems) !== JSON.stringify(
+        existing.items.map((item) => ({ text: item.text, checked: item.checked }))
+      )
+
+    if (itemsChanged && nextItems) {
       await prisma.$transaction(async (tx) => {
         await tx.note.update({ where: { id }, data })
         await tx.noteItem.deleteMany({ where: { noteId: id } })
-        if (body.items.length) {
+        if (nextItems.length) {
           await tx.noteItem.createMany({
-            data: body.items
-              .map((item: any, index: number) => ({
+            data: nextItems
+              .map((item: { text: string; checked: boolean }, index: number) => ({
                 noteId: id,
-                text: String(item.text || "").trim(),
-                checked: Boolean(item.checked),
+                text: item.text,
+                checked: item.checked,
                 position: index,
               }))
-              .filter((item: any) => item.text),
           })
         }
       })

@@ -8,6 +8,21 @@ import { adminMessaging } from "@/lib/firebase-admin"
 function routeFor(title: string) {
   const t = title.toLowerCase()
 
+  if (t.includes("income")) {
+    return "/income"
+  }
+
+  if (t.includes("receipt")) {
+    return "/expenses"
+  }
+
+  if (
+    t.includes("summary") ||
+    t.includes("unusual")
+  ) {
+    return "/analytics"
+  }
+
   if (t.includes("budget")) {
     return "/budgets"
   }
@@ -58,7 +73,22 @@ function allowed(title: string, pref: any) {
     return pref.recurring
   }
 
-  return false
+  /*
+    General WalletIQ alerts do not have
+    separate preference columns yet.
+
+    Examples:
+    - receipt scan saved
+    - income added
+    - monthly summary
+    - unusual spending
+    - low remaining balance
+
+    If account-level push is enabled,
+    allow these instead of silently
+    dropping them.
+  */
+  return true
 }
 
 /* ========================================

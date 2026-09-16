@@ -46,6 +46,12 @@ export default function PushRuntime() {
       let cancelled = false
 
       ;(async () => {
+        await new Promise((resolve) =>
+          setTimeout(resolve, 1200)
+        )
+
+        if (cancelled) return
+
         try {
           if (localNotifications) {
             await localNotifications.createChannel({
@@ -62,6 +68,7 @@ export default function PushRuntime() {
             "pushNotificationReceived",
             async (notification: any) => {
               if (cancelled) return
+              window.dispatchEvent(new Event("walletiq:push"))
 
               const title =
                 notification?.title ||
@@ -157,14 +164,17 @@ export default function PushRuntime() {
     let cancelled = false
 
     ;(async () => {
+      await new Promise((resolve) =>
+        setTimeout(resolve, 1200)
+      )
+
+      if (cancelled) return
+
       const messaging = await browserMessaging()
       if (!messaging || cancelled) return
 
       /*
-        Refresh/register the current browser token on every signed-in
-        WalletIQ app-shell load. The subscription endpoint removes stale
-        web tokens for this user, which prevents old Chrome registrations
-        from receiving the same push twice.
+        Refresh/register the current browser token periodically.
       */
       if (
         "Notification" in window &&
@@ -172,28 +182,50 @@ export default function PushRuntime() {
         "serviceWorker" in navigator
       ) {
         try {
-          const registration =
-            await navigator.serviceWorker.register(
-              "/firebase-messaging-sw.js"
-            )
+          const lastRefresh = Number(
+            sessionStorage.getItem(
+              "walletiq-push-refresh-at"
+            ) || "0"
+          )
 
-          const token = await getToken(messaging, {
-            vapidKey:
-              process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
-            serviceWorkerRegistration: registration,
-          })
+          const shouldRefresh =
+            !lastRefresh ||
+            Date.now() - lastRefresh >=
+              60 * 60 * 1000
 
-          if (token && !cancelled) {
-            await fetch("/api/push/subscription", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                token,
-                userAgent: navigator.userAgent,
-              }),
+          if (shouldRefresh) {
+            const registration =
+              await navigator.serviceWorker.register(
+                "/firebase-messaging-sw.js"
+              )
+
+            const token = await getToken(messaging, {
+              vapidKey:
+                process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
+              serviceWorkerRegistration: registration,
             })
+
+            if (token && !cancelled) {
+              const response = await fetch("/api/push/subscription", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  token,
+                  userAgent: navigator.userAgent,
+                }),
+              })
+
+              if (!response.ok) {
+                throw new Error("Push subscription refresh failed")
+              }
+
+              sessionStorage.setItem(
+                "walletiq-push-refresh-at",
+                String(Date.now())
+              )
+            }
           }
         } catch (error) {
           console.error(
@@ -208,6 +240,7 @@ export default function PushRuntime() {
       unsubscribe = onMessage(
         messaging,
         async (payload) => {
+          window.dispatchEvent(new Event("walletiq:push"))
           const title =
             payload.data?.title ||
             payload.notification?.title ||

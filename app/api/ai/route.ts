@@ -16,15 +16,24 @@ export async function POST(req: Request) {
     const question = String(body.question || "").trim()
     if (!question) return NextResponse.json({ error: "Please enter a question." }, { status: 400 })
 
-    const expenses = await prisma.expense.findMany({ where: { userId }, orderBy: { date: "desc" }, take: 300 })
-    const incomes = await prisma.income.findMany({ where: { userId }, orderBy: { date: "desc" }, take: 100 })
+    const [expenses, incomes] = await Promise.all([
+      prisma.expense.findMany({
+        where: { userId }, orderBy: { date: "desc" }, take: 150,
+        select: { merchant: true, amount: true, category: true, paymentMethod: true, date: true },
+      }),
+      prisma.income.findMany({
+        where: { userId }, orderBy: { date: "desc" }, take: 60,
+        select: { source: true, amount: true, category: true, date: true },
+      }),
+    ])
 
-    const prompt = `You are a concise personal-finance assistant inside WalletIQ. Currency is Indian Rupees (₹). Answer ONLY from the user's data below. Calculate carefully, never invent transactions, and say when data is insufficient.\n\nEXPENSES:\n${JSON.stringify(expenses.map(e => ({ merchant: e.merchant, amount: Number(e.amount), category: e.category, paymentMethod: e.paymentMethod, date: e.date.toISOString().slice(0,10), notes: e.notes })))}\n\nINCOME:\n${JSON.stringify(incomes.map(i => ({ source: i.source, amount: Number(i.amount), category: i.category, date: i.date.toISOString().slice(0,10) })))}\n\nQUESTION:\n${question}`
+    const prompt = `You are a concise personal-finance assistant inside WalletIQ. Currency is Indian Rupees (₹). Answer ONLY from the user's data below. Calculate carefully, never invent transactions, and say when data is insufficient. These are the most recent 150 expenses and 60 incomes; do not claim older history is complete.\n\nEXPENSES:\n${JSON.stringify(expenses.map(e => ({ merchant: e.merchant, amount: Number(e.amount), category: e.category, paymentMethod: e.paymentMethod, date: e.date.toISOString().slice(0,10) })))}\n\nINCOME:\n${JSON.stringify(incomes.map(i => ({ source: i.source, amount: Number(i.amount), category: i.category, date: i.date.toISOString().slice(0,10) })))}\n\nQUESTION:\n${question}`
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
       {
         method: "POST",
+        signal: AbortSignal.timeout(25000),
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }] }),
       }

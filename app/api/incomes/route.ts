@@ -1,6 +1,7 @@
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { createIncomeAddedNotification, syncAllNotifications } from "@/lib/notifications"
+import { deliverNotificationPushes } from "@/lib/push"
 import { after, NextResponse } from "next/server"
 
 async function getUserId() {
@@ -40,7 +41,10 @@ export async function POST(req: Request) {
 
     after(async () => {
       try {
-        await createIncomeAddedNotification(userId, income.source, amount)
+        const notification =
+          await createIncomeAddedNotification(userId, income.source, amount)
+
+        await deliverNotificationPushes(userId, [notification.id])
         await syncAllNotifications(userId)
       } catch (error) {
         console.error("Income notification sync error:", error)

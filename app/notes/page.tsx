@@ -196,6 +196,7 @@ export default function NotesPage() {
   const [actionError, setActionError] = useState("")
   const [createdSuggestionIds, setCreatedSuggestionIds] = useState<string[]>([])
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const saveQueue = useRef<Promise<void>>(Promise.resolve())
   const firstDraftRender = useRef(true)
 
   function say(message: string, type: "success" | "error" = "success") {
@@ -252,11 +253,12 @@ export default function NotesPage() {
     setCreatedSuggestionIds([])
   }
 
-  async function persist(
+  function persist(
     note: Note,
     syncEditor = true
   ) {
     setSaveState("saving")
+    const save = async () => {
     try {
       const response = await fetch(`/api/notes/${note.id}`, {
         method: "PATCH",
@@ -268,7 +270,7 @@ export default function NotesPage() {
           archived: note.archived,
           color: note.color,
           tags: note.tags,
-          items: note.items,
+          ...(note.type === "CHECKLIST" ? { items: note.items } : {}),
         }),
       })
       const updated = await response.json().catch(() => ({}))
@@ -282,26 +284,18 @@ export default function NotesPage() {
       )
 
       if (syncEditor) {
-        setEditing(updated)
+        setEditing((current) => current?.id === updated.id ? updated : current)
 
-        setDraft((current) => {
-          if (!current) return null
-
-          if (current.id !== updated.id) {
-            return current
-          }
-
-          return {
-            ...current,
-            updatedAt: updated.updatedAt,
-          } as Note
-        })
       }
 
-      setSaveState("saved")
+      if (syncEditor) setSaveState("saved")
     } catch {
-      setSaveState("error")
+      if (syncEditor) setSaveState("error")
     }
+    }
+    const queued = saveQueue.current.then(save, save)
+    saveQueue.current = queued
+    return queued
   }
 
   useEffect(() => {
@@ -311,11 +305,11 @@ export default function NotesPage() {
       return
     }
     if (saveTimer.current) clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(() => persist(draft), 650)
+    saveTimer.current = setTimeout(() => persist(draft), 900)
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current)
     }
-  }, [draft?.title, draft?.content, draft?.pinned, draft?.archived, draft?.color, JSON.stringify(draft?.tags), JSON.stringify(draft?.items)])
+  }, [draft])
 
   async function closeEditor() {
     if (!draft) {
@@ -360,6 +354,7 @@ export default function NotesPage() {
     setActionError("")
 
     if (emptyNote(noteToClose)) {
+      await saveQueue.current
       await fetch(
         `/api/notes/${noteToClose.id}`,
         {

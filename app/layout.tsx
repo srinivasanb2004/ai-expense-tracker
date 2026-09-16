@@ -1,9 +1,11 @@
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import "./globals.css"
 import Providers from "@/components/providers"
 
 export const metadata: Metadata = {
   title: "WalletIQ",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, title: "WalletIQ", statusBarStyle: "default" },
   description:
     "WalletIQ — AI-powered personal finance, expense tracking, budgets, recurring payments, receipt scanning and spending insights.",
   icons: {
@@ -11,6 +13,13 @@ export const metadata: Metadata = {
     shortcut: "/icon.png",
     apple: "/icon.png",
   },
+}
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#101b1a",
 }
 
 const themeScript = `
