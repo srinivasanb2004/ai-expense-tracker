@@ -102,27 +102,31 @@ async function DashboardContent({ userId }: { userId: string }) {
       amount: Prisma.Decimal | null
     }
   }[] = []
-  let recent: any[] = []
-  let activeBorrowLend: {
-    id: string
-    type: string
-    amount: Prisma.Decimal
-  }[] = []
-  let repayments: {
-    borrowLendId: string
-    _sum: {
-      amount: Prisma.Decimal | null
-    }
-  }[] = []
+  // Start independent sections immediately. Their Suspense boundaries let
+  // each section appear as soon as its own database work completes.
+  const recentPromise = prisma.expense.findMany({
+    where: { userId },
+    orderBy: { date: "desc" },
+    take: 6,
+    select: { id: true, merchant: true, category: true, amount: true, date: true },
+  })
+  const borrowPromise = Promise.all([
+    prisma.borrowLend.findMany({
+      where: { userId, status: { not: "SETTLED" } },
+      select: { id: true, type: true, amount: true },
+    }),
+    prisma.borrowLendRepayment.groupBy({
+      by: ["borrowLendId"],
+      where: { borrowLend: { userId, status: { not: "SETTLED" } } },
+      _sum: { amount: true },
+    }),
+  ])
 
   try {
     ;[
       incomeTotals,
       budgetTotals,
       categoryTotals,
-      recent,
-      activeBorrowLend,
-      repayments,
     ] =
       await Promise.all([
         prisma.income.aggregate({
@@ -168,41 +172,6 @@ async function DashboardContent({ userId }: { userId: string }) {
           },
         }),
 
-        prisma.expense.findMany({
-          where: {
-            userId,
-          },
-          orderBy: {
-            date: "desc",
-          },
-          take: 6,
-          select: {
-            id: true,
-            merchant: true,
-            category: true,
-            amount: true,
-            date: true,
-          },
-        }),
-
-        prisma.borrowLend.findMany({
-          where: { userId, status: { not: "SETTLED" } },
-          select: {
-            id: true,
-            type: true,
-            amount: true,
-          },
-        }),
-        prisma.borrowLendRepayment.groupBy({
-          by: ["borrowLendId"],
-          where: {
-            borrowLend: {
-              userId,
-              status: { not: "SETTLED" },
-            },
-          },
-          _sum: { amount: true },
-        }),
       ])
   } catch (error) {
     console.error(
@@ -270,46 +239,6 @@ async function DashboardContent({ userId }: { userId: string }) {
     budget > 0
       ? Math.min((spent / budget) * 100, 100)
       : 0
-
-  const repaymentByRecord = repayments.reduce(
-    (totals, item) => {
-      totals.set(
-        item.borrowLendId,
-        (totals.get(item.borrowLendId) || 0) +
-          decimalToNumber(item._sum.amount)
-      )
-
-      return totals
-    },
-    new Map<string, number>()
-  )
-
-  const borrowTotals =
-    activeBorrowLend.reduce(
-      (totals, item) => {
-        const paid =
-          repaymentByRecord.get(item.id) || 0
-        const remainingAmount = Math.max(
-          Number(item.amount) - paid,
-          0
-        )
-
-        if (item.type === "BORROWED") {
-          totals.youOwe += remainingAmount
-        } else if (item.type === "LENT") {
-          totals.owedToYou += remainingAmount
-        }
-
-        return totals
-      },
-      {
-        youOwe: 0,
-        owedToYou: 0,
-      }
-    )
-
-  const youOwe = borrowTotals.youOwe
-  const owedToYou = borrowTotals.owedToYou
 
   const topCategory = categoryTotals[0]
   const top = topCategory
@@ -424,10 +353,9 @@ async function DashboardContent({ userId }: { userId: string }) {
         )}
       </section>
 
-      <section className="mt-5 grid gap-4 sm:grid-cols-2">
-        <Link href="/borrow-lend" className="stat-card block transition hover:-translate-y-0.5"><div className="flex items-center justify-between"><span className="metric-label">You owe</span><ArrowUpRight size={18} className="text-rose-400"/></div><p className="mt-4 text-2xl font-black">{money(youOwe)}</p><p className="mt-1 text-xs muted">Outstanding borrowed money</p></Link>
-        <Link href="/borrow-lend" className="stat-card block transition hover:-translate-y-0.5"><div className="flex items-center justify-between"><span className="metric-label">Owed to you</span><ArrowDownRight size={18} className="accent"/></div><p className="mt-4 text-2xl font-black">{money(owedToYou)}</p><p className="mt-1 text-xs muted">Outstanding money you lent</p></Link>
-      </section>
+      <Suspense fallback={<div className="mt-5 grid gap-4 sm:grid-cols-2"><div className="skeleton h-28" /><div className="skeleton h-28" /></div>}>
+        <BorrowCards data={borrowPromise} />
+      </Suspense>
 
       {/* ACTIVITY + BUDGET */}
 
@@ -454,55 +382,9 @@ async function DashboardContent({ userId }: { userId: string }) {
           </div>
 
           <div className="mt-5 space-y-1">
-            {recent.length ? (
-              recent.map((item) => (
-                <div
-                  key={item.id}
-                  className="transaction-row"
-                >
-                  <div className="transaction-icon">
-                    <ReceiptText size={17} />
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-bold">
-                      {item.merchant}
-                    </p>
-
-                    <p className="mt-1 text-xs muted">
-                      {item.category} ·{" "}
-                      {item.date.toLocaleDateString(
-                        "en-IN",
-                        {
-                          day: "2-digit",
-                          month: "short",
-                        }
-                      )}
-                    </p>
-                  </div>
-
-                  <p className="text-sm font-black">
-                    -
-                    {money(
-                      Number(item.amount)
-                    )}
-                  </p>
-                </div>
-              ))
-            ) : (
-              <div className="empty-state">
-                <ReceiptText className="mx-auto accent" />
-
-                <p className="mt-4 font-bold">
-                  No transactions yet
-                </p>
-
-                <p className="mt-2 text-sm muted">
-                  Add your first expense to see it
-                  here.
-                </p>
-              </div>
-            )}
+            <Suspense fallback={[1, 2, 3, 4].map((item) => <div key={item} className="skeleton h-14" />)}>
+              <ActivityRows data={recentPromise} />
+            </Suspense>
           </div>
         </div>
 
@@ -585,4 +467,54 @@ async function DashboardContent({ userId }: { userId: string }) {
       </section>
     </>
   )
+}
+
+type RecentExpense = {
+  id: string
+  merchant: string
+  category: string
+  amount: Prisma.Decimal
+  date: Date
+}
+
+async function ActivityRows({ data }: { data: Promise<RecentExpense[]> }) {
+  try {
+    const recent = await data
+    if (!recent.length) {
+      return <div className="empty-state"><ReceiptText className="mx-auto accent" /><p className="mt-4 font-bold">No transactions yet</p><p className="mt-2 text-sm muted">Add your first expense to see it here.</p></div>
+    }
+    return <>{recent.map((item) => <div key={item.id} className="transaction-row">
+      <div className="transaction-icon"><ReceiptText size={17} /></div>
+      <div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{item.merchant}</p><p className="mt-1 text-xs muted">{item.category} · {item.date.toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}</p></div>
+      <p className="text-sm font-black">-{money(Number(item.amount))}</p>
+    </div>)}</>
+  } catch (error) {
+    console.error("Dashboard recent transactions error:", error)
+    return <p className="text-sm muted">Recent transactions could not be loaded.</p>
+  }
+}
+
+type BorrowData = [
+  { id: string; type: string; amount: Prisma.Decimal }[],
+  { borrowLendId: string; _sum: { amount: Prisma.Decimal | null } }[],
+]
+
+async function BorrowCards({ data }: { data: Promise<BorrowData> }) {
+  try {
+    const [records, repayments] = await data
+    const repaymentByRecord = new Map(repayments.map((item) => [item.borrowLendId, decimalToNumber(item._sum.amount)]))
+    const totals = records.reduce((result, item) => {
+      const remaining = Math.max(Number(item.amount) - (repaymentByRecord.get(item.id) || 0), 0)
+      if (item.type === "BORROWED") result.youOwe += remaining
+      if (item.type === "LENT") result.owedToYou += remaining
+      return result
+    }, { youOwe: 0, owedToYou: 0 })
+    return <section className="mt-5 grid gap-4 sm:grid-cols-2">
+      <Link href="/borrow-lend" className="stat-card block transition hover:-translate-y-0.5"><div className="flex items-center justify-between"><span className="metric-label">You owe</span><ArrowUpRight size={18} className="text-rose-400" /></div><p className="mt-4 text-2xl font-black">{money(totals.youOwe)}</p><p className="mt-1 text-xs muted">Outstanding borrowed money</p></Link>
+      <Link href="/borrow-lend" className="stat-card block transition hover:-translate-y-0.5"><div className="flex items-center justify-between"><span className="metric-label">Owed to you</span><ArrowDownRight size={18} className="accent" /></div><p className="mt-4 text-2xl font-black">{money(totals.owedToYou)}</p><p className="mt-1 text-xs muted">Outstanding money you lent</p></Link>
+    </section>
+  } catch (error) {
+    console.error("Dashboard borrow and lend error:", error)
+    return <p className="mt-5 text-sm muted">Borrow and lend totals could not be loaded.</p>
+  }
 }
