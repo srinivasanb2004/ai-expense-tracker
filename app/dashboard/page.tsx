@@ -28,8 +28,38 @@ function money(value: number) {
   }).format(value)
 }
 
-function decimalToNumber(value: Prisma.Decimal | null | undefined) {
+function decimalToNumber(value: Prisma.Decimal | number | string | null | undefined) {
   return value ? Number(value) : 0
+}
+
+type CategoryTotal = {
+  category: string
+  amount: Prisma.Decimal | number | string | null
+}
+
+type DashboardSummaryRow = {
+  income: Prisma.Decimal | number | string | null
+  budget: Prisma.Decimal | number | string | null
+  categories: unknown
+}
+
+function normalizeCategoryTotals(value: unknown): CategoryTotal[] {
+  const categories = typeof value === "string" ? JSON.parse(value) : value
+
+  if (!Array.isArray(categories)) return []
+
+  return categories.flatMap((item) => {
+    if (!item || typeof item !== "object") return []
+
+    const category = (item as { category?: unknown }).category
+
+    if (typeof category !== "string") return []
+
+    return [{
+      category,
+      amount: (item as { amount?: Prisma.Decimal | number | string | null }).amount ?? null,
+    }]
+  })
 }
 
 export default async function Dashboard() {
@@ -86,22 +116,7 @@ async function DashboardContent({ userId }: { userId: string }) {
     1
   )
 
-  let incomeTotals: {
-    _sum: {
-      amount: Prisma.Decimal | null
-    }
-  } | null = null
-  let budgetTotals: {
-    _sum: {
-      amount: Prisma.Decimal | null
-    }
-  } | null = null
-  let categoryTotals: {
-    category: string
-    _sum: {
-      amount: Prisma.Decimal | null
-    }
-  }[] = []
+  let summary: DashboardSummaryRow | undefined
   // Start independent sections immediately. Their Suspense boundaries let
   // each section appear as soon as its own database work completes.
   const recentPromise = prisma.expense.findMany({
@@ -123,56 +138,40 @@ async function DashboardContent({ userId }: { userId: string }) {
   ])
 
   try {
-    ;[
-      incomeTotals,
-      budgetTotals,
-      categoryTotals,
-    ] =
-      await Promise.all([
-        prisma.income.aggregate({
-          where: {
-            userId,
-            date: {
-              gte: start,
-              lt: end,
-            },
-          },
-          _sum: {
-            amount: true,
-          },
-        }),
-
-        prisma.budget.aggregate({
-          where: {
-            userId,
-            month: now.getMonth() + 1,
-            year: now.getFullYear(),
-          },
-          _sum: {
-            amount: true,
-          },
-        }),
-
-        prisma.expense.groupBy({
-          by: ["category"],
-          where: {
-            userId,
-            date: {
-              gte: start,
-              lt: end,
-            },
-          },
-          _sum: {
-            amount: true,
-          },
-          orderBy: {
-            _sum: {
-              amount: "desc",
-            },
-          },
-        }),
-
-      ])
+    ;[summary] = await prisma.$queryRaw<DashboardSummaryRow[]>`
+      SELECT
+        COALESCE((
+          SELECT SUM("amount")
+          FROM "Income"
+          WHERE "userId" = ${userId}
+            AND "date" >= ${start}
+            AND "date" < ${end}
+        ), 0) AS "income",
+        COALESCE((
+          SELECT SUM("amount")
+          FROM "Budget"
+          WHERE "userId" = ${userId}
+            AND "month" = ${now.getMonth() + 1}
+            AND "year" = ${now.getFullYear()}
+        ), 0) AS "budget",
+        COALESCE((
+          SELECT json_agg(
+            json_build_object(
+              'category', "category",
+              'amount', "amount"
+            )
+            ORDER BY "amount" DESC
+          )
+          FROM (
+            SELECT "category", SUM("amount") AS "amount"
+            FROM "Expense"
+            WHERE "userId" = ${userId}
+              AND "date" >= ${start}
+              AND "date" < ${end}
+            GROUP BY "category"
+          ) AS "category_totals"
+        ), '[]'::json) AS "categories"
+    `
   } catch (error) {
     console.error(
       "Dashboard database connection error:",
@@ -218,21 +217,21 @@ async function DashboardContent({ userId }: { userId: string }) {
     )
   }
 
-  const spent = Number(
-    categoryTotals.reduce(
-      (total, category) => total.add(category._sum.amount ?? 0),
-      new Prisma.Decimal(0)
-    )
+  const categoryTotals = normalizeCategoryTotals(summary?.categories)
+
+  const spent = categoryTotals.reduce(
+    (total, category) => total + decimalToNumber(category.amount),
+    0
   )
 
   const income = decimalToNumber(
-    incomeTotals?._sum.amount
+    summary?.income
   )
 
   const remaining = income - spent
 
   const budget = decimalToNumber(
-    budgetTotals?._sum.amount
+    summary?.budget
   )
 
   const budgetUsed =
@@ -244,7 +243,7 @@ async function DashboardContent({ userId }: { userId: string }) {
   const top = topCategory
     ? [
         topCategory.category,
-        decimalToNumber(topCategory._sum.amount),
+        decimalToNumber(topCategory.amount),
       ] as const
     : null
 
