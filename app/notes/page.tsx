@@ -128,6 +128,41 @@ function emptyNote(note: Note) {
   return !note.title?.trim() && !note.content?.trim() && !note.items.some((item) => item.text.trim())
 }
 
+function localNote(type: Note["type"]): Note {
+  const now = new Date().toISOString()
+
+  return {
+    id: `local-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    title: "",
+    content: "",
+    type,
+    pinned: false,
+    archived: false,
+    color: "default",
+    tags: [],
+    createdAt: now,
+    updatedAt: now,
+    items: type === "CHECKLIST" ? [{ text: "", checked: false }] : [],
+  }
+}
+
+function isLocalNote(note: Note) {
+  return note.id.startsWith("local-")
+}
+
+function mergeCreatedNote(local: Note, created: Note): Note {
+  return {
+    ...created,
+    title: local.title ?? created.title,
+    content: local.content ?? created.content,
+    pinned: local.pinned,
+    archived: local.archived,
+    color: local.color,
+    tags: local.tags,
+    items: local.type === "CHECKLIST" ? local.items : created.items,
+  }
+}
+
 function ActionDateField({
   value,
   placeholder,
@@ -198,6 +233,8 @@ export default function NotesPage() {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const saveQueue = useRef<Promise<void>>(Promise.resolve())
   const firstDraftRender = useRef(true)
+  const pendingCreates = useRef<Record<string, Promise<Note | null>>>({})
+  const closedLocalDrafts = useRef<Record<string, Note>>({})
 
   function say(message: string, type: "success" | "error" = "success") {
     setToast({ message, type })
@@ -224,19 +261,71 @@ export default function NotesPage() {
 
   async function create(type: "TEXT" | "CHECKLIST") {
     setPlusOpen(false)
-    try {
-      const response = await fetch("/api/notes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type }),
+    const optimistic = localNote(type)
+    setNotes((current) => [optimistic, ...current])
+    openEditor(optimistic)
+
+    const createRequest = fetch("/api/notes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type }),
+    })
+      .then(async (response) => {
+        const note = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(note.error || "Could not create note.")
+        return note as Note
       })
-      const note = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(note.error || "Could not create note.")
-      setNotes((current) => [note, ...current])
-      openEditor(note)
-    } catch (error) {
-      say(error instanceof Error ? error.message : "Could not create note.", "error")
-    }
+      .catch((error) => {
+        setNotes((current) => current.filter((item) => item.id !== optimistic.id))
+        setEditing((current) => current?.id === optimistic.id ? null : current)
+        setDraft((current) => current?.id === optimistic.id ? null : current)
+        say(error instanceof Error ? error.message : "Could not create note.", "error")
+        return null
+      })
+      .finally(() => {
+        delete pendingCreates.current[optimistic.id]
+      })
+
+    pendingCreates.current[optimistic.id] = createRequest
+
+    try {
+      const note = await createRequest
+      if (!note) return
+
+      const closedDraft = closedLocalDrafts.current[optimistic.id]
+
+      if (closedDraft) {
+        delete closedLocalDrafts.current[optimistic.id]
+
+        if (emptyNote(closedDraft)) {
+          await fetch(`/api/notes/${note.id}`, { method: "DELETE" }).catch(() => null)
+          return
+        }
+
+        const savedNote = mergeCreatedNote(closedDraft, note)
+        setNotes((current) => [savedNote, ...current.filter((item) => item.id !== optimistic.id)])
+        await persist(savedNote, false)
+        return
+      }
+
+      setNotes((current) =>
+        current.map((item) =>
+          item.id === optimistic.id
+            ? mergeCreatedNote(item, note)
+            : item
+        )
+      )
+      setEditing((current) =>
+        current?.id === optimistic.id
+          ? mergeCreatedNote(current, note)
+          : current
+      )
+      setDraft((current) =>
+        current?.id === optimistic.id
+          ? mergeCreatedNote(current, note)
+          : current
+      )
+    } catch {}
   }
 
   function openEditor(note: Note) {
@@ -257,6 +346,8 @@ export default function NotesPage() {
     note: Note,
     syncEditor = true
   ) {
+    if (isLocalNote(note)) return Promise.resolve()
+
     setSaveState("saving")
     const save = async () => {
     try {
@@ -353,6 +444,12 @@ export default function NotesPage() {
     setActionForm({})
     setActionError("")
 
+    if (isLocalNote(noteToClose)) {
+      closedLocalDrafts.current[noteToClose.id] = noteToClose
+      setNotes((current) => current.filter((item) => item.id !== noteToClose.id))
+      return
+    }
+
     if (emptyNote(noteToClose)) {
       await saveQueue.current
       await fetch(
@@ -387,6 +484,8 @@ export default function NotesPage() {
   async function quickPatch(note: Note, patch: Partial<Note>) {
     const optimistic = { ...note, ...patch }
     setNotes((current) => current.map((item) => (item.id === note.id ? optimistic : item)))
+    if (isLocalNote(note)) return
+
     try {
       const response = await fetch(`/api/notes/${note.id}`, {
         method: "PATCH",
@@ -404,6 +503,16 @@ export default function NotesPage() {
 
   async function remove(note: Note) {
     setDeleteTarget(null)
+    if (isLocalNote(note)) {
+      closedLocalDrafts.current[note.id] = note
+      setNotes((current) => current.filter((item) => item.id !== note.id))
+      if (editing?.id === note.id) {
+        setEditing(null)
+        setDraft(null)
+      }
+      return
+    }
+
     const previous = notes
     setNotes((current) => current.filter((item) => item.id !== note.id))
     if (editing?.id === note.id) {
