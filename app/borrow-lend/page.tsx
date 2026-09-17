@@ -191,6 +191,7 @@ function DateField({
 
 export default function BorrowLendPage() {
   const [items, setItems] = useState<RecordItem[]>([])
+  const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState("")
@@ -201,8 +202,15 @@ export default function BorrowLendPage() {
   function say(message:string,type:"success"|"error"="success"){setToast({message,type});setTimeout(()=>setToast(null),2500)}
 
   async function load() {
-    const response = await fetch("/api/borrow-lend", { cache: "no-store" })
-    if (response.ok) setItems(await response.json())
+    try {
+      const response = await fetch("/api/borrow-lend", { cache: "no-store" })
+      if (!response.ok) throw new Error("Unable to load records")
+      setItems(await response.json())
+    } catch {
+      setMessage("Unable to load records. Please refresh to try again.")
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
@@ -522,7 +530,8 @@ export default function BorrowLendPage() {
             )
           })}
 
-          {!active.length && (
+          {loading && [1, 2, 3, 4].map((item) => <div key={item} className="skeleton h-52" />)}
+          {!loading && !active.length && (
             <div className="empty-state lg:col-span-2">
               <HandCoins className="mx-auto accent" />
               <p className="mt-4 font-black">Nothing pending</p>
@@ -594,7 +603,8 @@ export default function BorrowLendPage() {
             )
           })}
 
-          {!people.length && <p className="py-6 text-center text-sm muted">No person history yet.</p>}
+          {loading && [1, 2, 3].map((item) => <div key={item} className="skeleton h-14" />)}
+          {!loading && !people.length && <p className="py-6 text-center text-sm muted">No person history yet.</p>}
         </div>
       </section>
     </AppShell>

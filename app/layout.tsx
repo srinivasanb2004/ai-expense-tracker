@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next"
 import "./globals.css"
-import Providers from "@/components/providers"
 
 export const metadata: Metadata = {
   title: "WalletIQ",
@@ -54,7 +53,7 @@ export default function RootLayout({
       </head>
 
       <body>
-        <Providers>{children}</Providers>
+        {children}
       </body>
     </html>
   )

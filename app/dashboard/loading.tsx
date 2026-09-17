@@ -1,2 +1,5 @@
-import AppShell from "@/components/app-shell"
-export default function Loading(){return <AppShell><div className="skeleton h-5 w-36"/><div className="mt-3 skeleton h-10 w-72"/><div className="mt-6 flex gap-2"><div className="skeleton h-11 w-32"/><div className="skeleton h-11 w-28"/><div className="skeleton h-11 w-32"/></div><div className="mt-6 skeleton h-64 rounded-[30px]"/><div className="mt-5 grid gap-4 sm:grid-cols-3">{[1,2,3].map(x=><div key={x} className="skeleton h-28"/>)}</div><div className="mt-5 grid gap-5 xl:grid-cols-2"><div className="skeleton h-80"/><div className="skeleton h-80"/></div></AppShell>}
+import PageSkeleton from "@/components/page-skeleton"
+
+export default function Loading() {
+  return <PageSkeleton variant="dashboard" />
+}
