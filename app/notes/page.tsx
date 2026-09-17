@@ -163,6 +163,10 @@ function mergeCreatedNote(local: Note, created: Note): Note {
   }
 }
 
+function touchNote(note: Note): Note {
+  return { ...note, updatedAt: new Date().toISOString() }
+}
+
 function ActionDateField({
   value,
   placeholder,
@@ -232,8 +236,8 @@ export default function NotesPage() {
   const [createdSuggestionIds, setCreatedSuggestionIds] = useState<string[]>([])
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const saveQueue = useRef<Promise<void>>(Promise.resolve())
+  const saveVersions = useRef<Record<string, number>>({})
   const firstDraftRender = useRef(true)
-  const pendingCreates = useRef<Record<string, Promise<Note | null>>>({})
   const closedLocalDrafts = useRef<Record<string, Note>>({})
 
   function say(message: string, type: "success" | "error" = "success") {
@@ -282,11 +286,6 @@ export default function NotesPage() {
         say(error instanceof Error ? error.message : "Could not create note.", "error")
         return null
       })
-      .finally(() => {
-        delete pendingCreates.current[optimistic.id]
-      })
-
-    pendingCreates.current[optimistic.id] = createRequest
 
     try {
       const note = await createRequest
@@ -348,7 +347,10 @@ export default function NotesPage() {
   ) {
     if (isLocalNote(note)) return Promise.resolve()
 
-    setSaveState("saving")
+    const saveVersion = (saveVersions.current[note.id] || 0) + 1
+    saveVersions.current[note.id] = saveVersion
+
+    if (syncEditor) setSaveState("saving")
     const save = async () => {
     try {
       const response = await fetch(`/api/notes/${note.id}`, {
@@ -366,22 +368,26 @@ export default function NotesPage() {
       })
       const updated = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(updated.error || "Could not save note.")
-      setNotes((current) =>
-        current.map((item) =>
-          item.id === updated.id
-            ? updated
-            : item
+
+      if (saveVersions.current[note.id] === saveVersion) {
+        setNotes((current) =>
+          current.map((item) =>
+            item.id === updated.id
+              ? updated
+              : item
+          )
         )
-      )
 
-      if (syncEditor) {
-        setEditing((current) => current?.id === updated.id ? updated : current)
+        if (syncEditor) {
+          setEditing((current) => current?.id === updated.id ? updated : current)
+        }
 
+        if (syncEditor) setSaveState("saved")
       }
-
-      if (syncEditor) setSaveState("saved")
     } catch {
-      if (syncEditor) setSaveState("error")
+      if (saveVersions.current[note.id] === saveVersion && syncEditor) {
+        setSaveState("error")
+      }
     }
     }
     const queued = saveQueue.current.then(save, save)
@@ -446,11 +452,27 @@ export default function NotesPage() {
 
     if (isLocalNote(noteToClose)) {
       closedLocalDrafts.current[noteToClose.id] = noteToClose
-      setNotes((current) => current.filter((item) => item.id !== noteToClose.id))
+      setNotes((current) => {
+        if (emptyNote(noteToClose)) {
+          return current.filter((item) => item.id !== noteToClose.id)
+        }
+
+        const updated = touchNote(noteToClose)
+        return current.some((item) => item.id === noteToClose.id)
+          ? current.map((item) => (item.id === noteToClose.id ? updated : item))
+          : [updated, ...current]
+      })
       return
     }
 
     if (emptyNote(noteToClose)) {
+      setNotes((current) =>
+        current.filter(
+          (item) =>
+            item.id !== noteToClose.id
+        )
+      )
+
       await saveQueue.current
       await fetch(
         `/api/notes/${noteToClose.id}`,
@@ -459,17 +481,19 @@ export default function NotesPage() {
         }
       ).catch(() => null)
 
-      setNotes((current) =>
-        current.filter(
-          (item) =>
-            item.id !== noteToClose.id
-        )
-      )
-
       return
     }
 
     if (needsSave) {
+      const optimisticNote = touchNote(noteToClose)
+      setNotes((current) =>
+        current.map((item) =>
+          item.id === noteToClose.id
+            ? optimisticNote
+            : item
+        )
+      )
+
       /*
         Save the final snapshot without syncing the
         closed editor state back into the modal.
@@ -548,7 +572,15 @@ export default function NotesPage() {
   }, [notes, query, filter])
 
   function updateDraft(patch: Partial<Note>) {
-    setDraft((current) => (current ? { ...current, ...patch } : current))
+    if (!draft) return
+
+    const updated = touchNote({ ...draft, ...patch })
+    setDraft(updated)
+    setNotes((current) =>
+      current.some((item) => item.id === updated.id)
+        ? current.map((item) => (item.id === updated.id ? updated : item))
+        : [updated, ...current]
+    )
   }
 
   function addChecklistItem() {
@@ -1168,12 +1200,19 @@ export default function NotesPage() {
             <div className="flex items-center justify-between gap-3 border-t p-4" style={{ borderColor: "var(--line)" }}>
               <button
                 type="button"
-                onClick={async () => {
-                  const next = { ...draft, archived: !draft.archived }
+                onClick={() => {
+                  const next = touchNote({ ...draft, archived: !draft.archived })
                   if (saveTimer.current) clearTimeout(saveTimer.current)
-                  await persist(next)
+                  setNotes((current) =>
+                    current.map((item) =>
+                      item.id === next.id
+                        ? next
+                        : item
+                    )
+                  )
                   setEditing(null)
                   setDraft(null)
+                  void persist(next, false)
                 }}
                 className="btn btn-secondary min-w-0 flex-1 justify-center sm:flex-none"
               >
