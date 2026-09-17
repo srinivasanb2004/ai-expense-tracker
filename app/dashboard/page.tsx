@@ -18,6 +18,7 @@ import {
 import Greeting from "@/components/greeting"
 import Link from "next/link"
 import { Prisma } from "@prisma/client"
+import { Suspense } from "react"
 
 function money(value: number) {
   return new Intl.NumberFormat("en-IN", {
@@ -40,6 +41,37 @@ export default async function Dashboard() {
 
   if (!userId) return null
 
+  const month = new Date().toLocaleDateString("en-IN", { month: "long", year: "numeric" })
+
+  return <AppShell>
+    <div>
+      <p className="eyebrow">{month}</p>
+      <h2 className="text-3xl font-black"><Greeting name={session?.user?.name} /></h2>
+      <p className="mt-2 text-sm muted">Here&apos;s how your money is moving this month.</p>
+    </div>
+    <section className="mt-5 flex flex-wrap gap-2" aria-label="Quick actions">
+      <Link href="/expenses?new=1" className="btn btn-primary"><Plus size={16} />Add expense</Link>
+      <Link href="/income" className="btn btn-secondary"><ArrowUpRight size={16} />Add income</Link>
+      <Link href="/borrow-lend" className="btn btn-secondary"><HandCoins size={16} />Borrow/Lend</Link>
+      <Link href="/scan" className="btn btn-secondary"><ScanLine size={16} />Scan receipt</Link>
+    </section>
+    <Suspense fallback={<DashboardContentSkeleton />}>
+      <DashboardContent userId={userId} />
+    </Suspense>
+  </AppShell>
+}
+
+function DashboardContentSkeleton() {
+  return <div role="status" aria-label="Loading dashboard data" className="space-y-5 pt-6">
+    <div className="skeleton h-56 rounded-[30px]" />
+    <div className="grid gap-4 sm:grid-cols-3">{[1, 2, 3].map((item) => <div key={item} className="skeleton h-28" />)}</div>
+    <div className="grid gap-4 sm:grid-cols-2">{[1, 2].map((item) => <div key={item} className="skeleton h-28" />)}</div>
+    <div className="grid gap-5 xl:grid-cols-2"><div className="skeleton h-80" /><div className="skeleton h-80" /></div>
+  </div>
+}
+
+async function DashboardContent({ userId }: { userId: string }) {
+
   const now = new Date()
 
   const start = new Date(
@@ -53,11 +85,6 @@ export default async function Dashboard() {
     now.getMonth() + 1,
     1
   )
-
-  const month = now.toLocaleDateString("en-IN", {
-    month: "long",
-    year: "numeric",
-  })
 
   let incomeTotals: {
     _sum: {
@@ -184,7 +211,7 @@ export default async function Dashboard() {
     )
 
     return (
-      <AppShell>
+      <>
         <div className="mx-auto flex min-h-[65vh] max-w-2xl items-center justify-center">
           <div className="soft-panel w-full text-center">
             <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-red-500/10 text-red-400">
@@ -218,7 +245,7 @@ export default async function Dashboard() {
             </p>
           </div>
         </div>
-      </AppShell>
+      </>
     )
   }
 
@@ -293,63 +320,7 @@ export default async function Dashboard() {
     : null
 
   return (
-    <AppShell>
-      <div>
-        <p className="eyebrow">
-          {month}
-        </p>
-
-        <h2 className="text-3xl font-black">
-          <Greeting
-            name={session?.user?.name}
-          />
-        </h2>
-
-        <p className="mt-2 text-sm muted">
-          Here&apos;s how your money is moving this
-          month.
-        </p>
-      </div>
-
-      {/* QUICK ACTIONS */}
-
-      <section
-        className="mt-5 flex flex-wrap gap-2"
-        aria-label="Quick actions"
-      >
-        <Link
-          href="/expenses?new=1"
-          className="btn btn-primary"
-        >
-          <Plus size={16} />
-          Add expense
-        </Link>
-
-        <Link
-          href="/income"
-          className="btn btn-secondary"
-        >
-          <ArrowUpRight size={16} />
-          Add income
-        </Link>
-
-        <Link
-          href="/borrow-lend"
-          className="btn btn-secondary"
-        >
-          <HandCoins size={16} />
-          Borrow/Lend
-        </Link>
-
-        <Link
-          href="/scan"
-          className="btn btn-secondary"
-        >
-          <ScanLine size={16} />
-          Scan receipt
-        </Link>
-      </section>
-
+    <>
       {/* BALANCE HERO */}
 
       <section className="hero-card mt-6">
@@ -612,6 +583,6 @@ export default async function Dashboard() {
           </div>
         </div>
       </section>
-    </AppShell>
+    </>
   )
 }
