@@ -1,6 +1,8 @@
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
-import { NextResponse } from "next/server"
+import { syncNoteReminderNotifications } from "@/lib/notifications"
+import { deliverNotificationPushes } from "@/lib/push"
+import { after, NextResponse } from "next/server"
 
 async function getUserId() {
   const session = await auth()
@@ -74,6 +76,22 @@ export async function PATCH(
       where: { id, userId },
       include: { items: { orderBy: { position: "asc" } } },
     })
+
+    if (updated?.type === "REMINDER") {
+      after(async () => {
+        try {
+          const notificationIds = await syncNoteReminderNotifications(userId, new Date(), {
+            noteId: id,
+          })
+
+          if (notificationIds.length) {
+            await deliverNotificationPushes(userId, notificationIds)
+          }
+        } catch (error) {
+          console.error("Reminder notification sync error:", error)
+        }
+      })
+    }
 
     return NextResponse.json(serialize(updated))
   } catch (error) {

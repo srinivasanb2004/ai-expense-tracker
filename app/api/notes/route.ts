@@ -1,6 +1,8 @@
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
-import { NextResponse } from "next/server"
+import { syncNoteReminderNotifications } from "@/lib/notifications"
+import { deliverNotificationPushes } from "@/lib/push"
+import { after, NextResponse } from "next/server"
 
 async function getUserId() {
   const session = await auth()
@@ -33,7 +35,8 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json().catch(() => ({}))
-    const type = String(body.type || "TEXT").toUpperCase() === "CHECKLIST" ? "CHECKLIST" : "TEXT"
+    const requestedType = String(body.type || "TEXT").toUpperCase()
+    const type = ["TEXT", "CHECKLIST", "REMINDER"].includes(requestedType) ? requestedType : "TEXT"
 
     const note = await prisma.note.create({
       data: {
@@ -41,9 +44,31 @@ export async function POST(req: Request) {
         type,
         title: body.title ? String(body.title) : null,
         content: body.content ? String(body.content) : null,
+        pinned: typeof body.pinned === "boolean" ? body.pinned : false,
+        archived: typeof body.archived === "boolean" ? body.archived : false,
+        color: typeof body.color === "string" ? body.color : "default",
+        tags: Array.isArray(body.tags)
+          ? body.tags.map((tag: unknown) => String(tag).trim()).filter(Boolean).slice(0, 8)
+          : [],
       },
       include: { items: true },
     })
+
+    if (type === "REMINDER") {
+      after(async () => {
+        try {
+          const notificationIds = await syncNoteReminderNotifications(userId, new Date(), {
+            noteId: note.id,
+          })
+
+          if (notificationIds.length) {
+            await deliverNotificationPushes(userId, notificationIds)
+          }
+        } catch (error) {
+          console.error("Reminder notification sync error:", error)
+        }
+      })
+    }
 
     return NextResponse.json(serialize(note), { status: 201 })
   } catch (error) {

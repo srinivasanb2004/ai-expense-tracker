@@ -7,7 +7,10 @@ import Toast, { ToastState } from "@/components/toast"
 import {
   Archive,
   ArchiveRestore,
+  AlarmClock,
+  Bell,
   Bot,
+  CalendarDays,
   Check,
   CheckSquare2,
   Palette,
@@ -64,7 +67,7 @@ type Note = {
   id: string
   title?: string | null
   content?: string | null
-  type: "TEXT" | "CHECKLIST"
+  type: "TEXT" | "CHECKLIST" | "REMINDER"
   pinned: boolean
   archived: boolean
   color: string
@@ -81,6 +84,28 @@ const noteColors = [
   { key: "amber", label: "Amber", value: "color-mix(in srgb, var(--panel) 87%, #f59e0b 13%)" },
   { key: "rose", label: "Rose", value: "color-mix(in srgb, var(--panel) 89%, #f43f5e 11%)" },
   { key: "violet", label: "Violet", value: "color-mix(in srgb, var(--panel) 88%, #8b5cf6 12%)" },
+]
+
+type ReminderNotificationKey =
+  | "AT_TIME"
+  | "TEN_MINUTES_BEFORE"
+  | "ONE_HOUR_BEFORE"
+  | "ONE_DAY_BEFORE"
+  | "ONE_WEEK_BEFORE"
+
+type ReminderData = {
+  description: string
+  date: string
+  time: string
+  notifications: ReminderNotificationKey[]
+}
+
+const reminderNotificationOptions: { key: ReminderNotificationKey; label: string }[] = [
+  { key: "AT_TIME", label: "At time of reminder" },
+  { key: "TEN_MINUTES_BEFORE", label: "10 minutes before" },
+  { key: "ONE_HOUR_BEFORE", label: "1 hour before" },
+  { key: "ONE_DAY_BEFORE", label: "1 day before" },
+  { key: "ONE_WEEK_BEFORE", label: "1 week before" },
 ]
 
 const noteThemes = [
@@ -125,16 +150,21 @@ function colorValue(key: string) {
 }
 
 function emptyNote(note: Note) {
+  if (note.type === "REMINDER") {
+    return !note.title?.trim()
+  }
+
   return !note.title?.trim() && !note.content?.trim() && !note.items.some((item) => item.text.trim())
 }
 
 function localNote(type: Note["type"]): Note {
   const now = new Date().toISOString()
+  const reminder = defaultReminderData()
 
   return {
     id: `local-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     title: "",
-    content: "",
+    content: type === "REMINDER" ? JSON.stringify(reminder) : "",
     type,
     pinned: false,
     archived: false,
@@ -165,6 +195,54 @@ function mergeCreatedNote(local: Note, created: Note): Note {
 
 function touchNote(note: Note): Note {
   return { ...note, updatedAt: new Date().toISOString() }
+}
+
+function todayInput() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function defaultReminderData(): ReminderData {
+  return {
+    description: "",
+    date: todayInput(),
+    time: "09:00",
+    notifications: ["AT_TIME"],
+  }
+}
+
+function reminderData(note: Note): ReminderData {
+  try {
+    const parsed = JSON.parse(note.content || "{}") as Partial<ReminderData>
+    const notifications = Array.isArray(parsed.notifications)
+      ? parsed.notifications
+          .map((item) => String(item))
+          .filter((item): item is ReminderNotificationKey =>
+            reminderNotificationOptions.some((option) => option.key === item)
+          )
+      : []
+
+    return {
+      description: typeof parsed.description === "string" ? parsed.description : "",
+      date: typeof parsed.date === "string" && parsed.date ? parsed.date : todayInput(),
+      time: typeof parsed.time === "string" && parsed.time ? parsed.time : "09:00",
+      notifications: notifications.length ? notifications : ["AT_TIME"],
+    }
+  } catch {
+    return defaultReminderData()
+  }
+}
+
+function reminderNotificationLabel(key: string) {
+  return reminderNotificationOptions.find((item) => item.key === key)?.label || "Reminder"
+}
+
+function formatReminderDate(date: string) {
+  if (!date) return "No date set"
+
+  return new Date(`${date}T00:00:00`).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+  })
 }
 
 function ActionDateField({
@@ -216,7 +294,7 @@ function ActionDateField({
 export default function NotesPage() {
   const [notes, setNotes] = useState<Note[]>([])
   const [query, setQuery] = useState("")
-  const [filter, setFilter] = useState<"all" | "pinned" | "checklists" | "archive">("all")
+  const [filter, setFilter] = useState<"all" | "pinned" | "checklists" | "reminders" | "archive">("all")
   const [plusOpen, setPlusOpen] = useState(false)
   const [editing, setEditing] = useState<Note | null>(null)
   const [draft, setDraft] = useState<Note | null>(null)
@@ -239,6 +317,7 @@ export default function NotesPage() {
   const saveVersions = useRef<Record<string, number>>({})
   const firstDraftRender = useRef(true)
   const closedLocalDrafts = useRef<Record<string, Note>>({})
+  const reminderSaveInFlight = useRef(false)
 
   function say(message: string, type: "success" | "error" = "success") {
     setToast({ message, type })
@@ -263,11 +342,15 @@ export default function NotesPage() {
     load()
   }, [])
 
-  async function create(type: "TEXT" | "CHECKLIST") {
+  async function create(type: Note["type"]) {
     setPlusOpen(false)
     const optimistic = localNote(type)
     setNotes((current) => [optimistic, ...current])
     openEditor(optimistic)
+
+    if (type === "REMINDER") {
+      return
+    }
 
     const createRequest = fetch("/api/notes", {
       method: "POST",
@@ -397,6 +480,7 @@ export default function NotesPage() {
 
   useEffect(() => {
     if (!draft) return
+    if (draft.type === "REMINDER") return
     if (firstDraftRender.current) {
       firstDraftRender.current = false
       return
@@ -449,6 +533,22 @@ export default function NotesPage() {
     setActionSuggestion(null)
     setActionForm({})
     setActionError("")
+
+    if (noteToClose.type === "REMINDER") {
+      setSaveState("saved")
+      setNotes((current) => {
+        if (isLocalNote(noteToClose)) {
+          return current.filter((item) => item.id !== noteToClose.id)
+        }
+
+        return current.map((item) =>
+          item.id === noteToClose.id && editing
+            ? editing
+            : item
+        )
+      })
+      return
+    }
 
     if (isLocalNote(noteToClose)) {
       closedLocalDrafts.current[noteToClose.id] = noteToClose
@@ -561,6 +661,7 @@ export default function NotesPage() {
         if (note.archived) return false
         if (filter === "pinned" && !note.pinned) return false
         if (filter === "checklists" && note.type !== "CHECKLIST") return false
+        if (filter === "reminders" && note.type !== "REMINDER") return false
         return true
       })
       .filter((note) => {
@@ -576,11 +677,127 @@ export default function NotesPage() {
 
     const updated = touchNote({ ...draft, ...patch })
     setDraft(updated)
+
+    if (updated.type === "REMINDER") return
+
     setNotes((current) =>
       current.some((item) => item.id === updated.id)
         ? current.map((item) => (item.id === updated.id ? updated : item))
         : [updated, ...current]
     )
+  }
+
+  function updateReminder(patch: Partial<ReminderData>) {
+    if (!draft) return
+    updateDraft({
+      content: JSON.stringify({
+        ...reminderData(draft),
+        ...patch,
+      }),
+    })
+  }
+
+  function addReminderNotification() {
+    if (!draft) return
+    const reminder = reminderData(draft)
+    const next = reminderNotificationOptions.find((item) => !reminder.notifications.includes(item.key))?.key
+    if (!next) return
+    updateReminder({
+      notifications: [...reminder.notifications, next],
+    })
+  }
+
+  function removeReminderNotification(index: number) {
+    if (!draft) return
+    const reminder = reminderData(draft)
+    updateReminder({
+      notifications: reminder.notifications.filter((_, itemIndex) => itemIndex !== index),
+    })
+  }
+
+  async function saveReminder() {
+    if (!draft || draft.type !== "REMINDER") return
+    if (reminderSaveInFlight.current) return
+
+    const reminder = touchNote({
+      ...draft,
+      title: draft.title?.trim() || "",
+    })
+
+    if (!reminder.title) {
+      say("Add a reminder name before saving.", "error")
+      return
+    }
+
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current)
+      saveTimer.current = null
+    }
+
+    setSaveState("saving")
+    reminderSaveInFlight.current = true
+
+    try {
+      if (isLocalNote(reminder)) {
+        const response = await fetch("/api/notes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "REMINDER",
+            title: reminder.title,
+            content: reminder.content || "",
+            pinned: reminder.pinned,
+            archived: reminder.archived,
+            color: reminder.color,
+            tags: reminder.tags,
+          }),
+        })
+        const created = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(created.error || "Could not save reminder.")
+
+        const saved = mergeCreatedNote(reminder, created as Note)
+        setNotes((current) =>
+          current.some((item) => item.id === reminder.id)
+            ? current.map((item) => (item.id === reminder.id ? saved : item))
+            : [saved, ...current]
+        )
+        setEditing(saved)
+        setDraft(saved)
+      } else {
+        const response = await fetch(`/api/notes/${reminder.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: reminder.title,
+            content: reminder.content || "",
+            pinned: reminder.pinned,
+            archived: reminder.archived,
+            color: reminder.color,
+            tags: reminder.tags,
+          }),
+        })
+        const updated = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(updated.error || "Could not save reminder.")
+
+        const saved = updated as Note
+        setNotes((current) =>
+          current.map((item) => (item.id === reminder.id ? saved : item))
+        )
+        setEditing(saved)
+        setDraft(saved)
+      }
+
+      setSaveState("saved")
+      say("Reminder saved")
+      setEditing(null)
+      setDraft(null)
+      setTagInput("")
+    } catch (error) {
+      setSaveState("error")
+      say(error instanceof Error ? error.message : "Could not save reminder.", "error")
+    } finally {
+      reminderSaveInFlight.current = false
+    }
   }
 
   function addChecklistItem() {
@@ -839,6 +1056,7 @@ export default function NotesPage() {
             ["all", "All"],
             ["pinned", "Pinned"],
             ["checklists", "Checklists"],
+            ["reminders", "Reminders"],
             ["archive", "Archive"],
           ] as const).map(([key, label]) => (
             <button
@@ -872,13 +1090,13 @@ export default function NotesPage() {
               <div className="flex items-start gap-2">
                 <button type="button" onClick={() => openEditor(note)} className="min-w-0 flex-1 text-left">
                   <div className="flex items-center gap-2">
-                    {note.type === "CHECKLIST" ? <CheckSquare2 size={16} className="accent" /> : <StickyNote size={16} className="accent" />}
-                    <h3 className="truncate font-black">{note.title?.trim() || (note.type === "CHECKLIST" ? "Checklist" : "Untitled note")}</h3>
+                    {note.type === "CHECKLIST" ? <CheckSquare2 size={16} className="accent" /> : note.type === "REMINDER" ? <AlarmClock size={16} className="accent" /> : <StickyNote size={16} className="accent" />}
+                    <h3 className="truncate font-black">{note.title?.trim() || (note.type === "CHECKLIST" ? "Checklist" : note.type === "REMINDER" ? "Untitled reminder" : "Untitled note")}</h3>
                   </div>
 
                   {note.type === "TEXT" ? (
                     note.content?.trim() && <p className="mt-3 whitespace-pre-wrap text-sm leading-6 muted line-clamp-7">{note.content}</p>
-                  ) : (
+                  ) : note.type === "CHECKLIST" ? (
                     <div className="mt-3 space-y-2">
                       {note.items.slice(0, 7).map((item, index) => (
                         <div key={`${note.id}-${index}`} className="flex items-start gap-2 text-sm">
@@ -888,6 +1106,24 @@ export default function NotesPage() {
                           <span className={item.checked ? "muted line-through" : ""}>{item.text}</span>
                         </div>
                       ))}
+                    </div>
+                  ) : (
+                    <div className="mt-4 space-y-3 text-sm">
+                      <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-bold" style={{ borderColor: "var(--line)" }}>
+                        <Bell size={14} className="accent" />
+                        Reminder
+                      </div>
+                      <div className="flex items-center gap-2 muted">
+                        <CalendarDays size={15} />
+                        <span>{formatReminderDate(reminderData(note).date)}</span>
+                      </div>
+                      <div className="flex items-center gap-2 muted">
+                        <Bell size={15} />
+                        <span>{reminderNotificationLabel(reminderData(note).notifications[0])}</span>
+                      </div>
+                      {reminderData(note).description && (
+                        <p className="line-clamp-3 text-sm leading-6 muted">{reminderData(note).description}</p>
+                      )}
                     </div>
                   )}
                 </button>
@@ -921,7 +1157,7 @@ export default function NotesPage() {
         <div className="empty-state mt-8 min-h-64">
           <StickyNote className="mx-auto accent" size={32} />
           <p className="mt-4 text-lg font-black">{query ? "No matching notes" : filter === "archive" ? "Archive is empty" : "No notes yet"}</p>
-          <p className="mt-2 text-sm muted">{query ? "Try another search." : "Tap the + button to create a note or checklist."}</p>
+          <p className="mt-2 text-sm muted">{query ? "Try another search." : "Tap the + button to create a note, checklist, or reminder."}</p>
         </div>
       )}
 
@@ -929,6 +1165,7 @@ export default function NotesPage() {
         {plusOpen && (
           <>
             <button type="button" onClick={() => create("CHECKLIST")} className="notes-fab-option"><CheckSquare2 size={18} /> Checklist</button>
+            <button type="button" onClick={() => create("REMINDER")} className="notes-fab-option"><AlarmClock size={18} /> Reminder</button>
             <button type="button" onClick={() => create("TEXT")} className="notes-fab-option"><StickyNote size={18} /> Note</button>
           </>
         )}
@@ -960,56 +1197,175 @@ export default function NotesPage() {
                 <X size={18} />
               </button>
               <span className={`min-w-0 flex-1 truncate text-center text-xs font-bold ${saveState === "error" ? "text-rose-400" : "muted"}`}>
-                {saveState === "saving" ? "Saving..." : saveState === "error" ? "Save failed" : "Saved"}
+                {draft.type === "REMINDER"
+                  ? saveState === "saving"
+                    ? "Saving..."
+                    : saveState === "error"
+                      ? "Save failed"
+                      : "Save when ready"
+                  : saveState === "saving"
+                    ? "Saving..."
+                    : saveState === "error"
+                      ? "Save failed"
+                      : "Saved"}
               </span>
-              <button
-                type="button"
-                onClick={() => updateDraft({ pinned: !draft.pinned })}
-                className="icon-button shrink-0"
-                aria-label={draft.pinned ? "Unpin note" : "Pin note"}
-                title={draft.pinned ? "Unpin note" : "Pin note"}
-              >
-                {draft.pinned ? <PinOff size={18} className="accent" /> : <Pin size={18} />}
-              </button>
+              {draft.type === "REMINDER" ? (
+                <button
+                  type="button"
+                  onClick={saveReminder}
+                  disabled={saveState === "saving"}
+                  className="btn btn-primary shrink-0 px-5 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isLocalNote(draft) ? "Create reminder" : "Save reminder"}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => updateDraft({ pinned: !draft.pinned })}
+                  className="icon-button shrink-0"
+                  aria-label={draft.pinned ? "Unpin note" : "Pin note"}
+                  title={draft.pinned ? "Unpin note" : "Pin note"}
+                >
+                  {draft.pinned ? <PinOff size={18} className="accent" /> : <Pin size={18} />}
+                </button>
+              )}
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:p-5">
-              <input
-                value={draft.title || ""}
-                onChange={(e) => updateDraft({ title: e.target.value })}
-                className="w-full min-w-0 bg-transparent text-xl font-black outline-none placeholder:muted sm:text-2xl"
-                placeholder="Title"
-              />
+              {draft.type === "REMINDER" ? (
+                (() => {
+                  const reminder = reminderData(draft)
 
-              {draft.type === "TEXT" ? (
-                <textarea
-                  value={draft.content || ""}
-                  onChange={(e) => updateDraft({ content: e.target.value })}
-                  className="mt-4 min-h-[220px] w-full resize-none bg-transparent text-base leading-7 outline-none placeholder:muted sm:min-h-[280px] sm:text-sm"
-                  placeholder="Take a note..."
-                  autoFocus
-                />
-              ) : (
-                <div className="mt-5 space-y-2">
-                  {draft.items.map((item, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <input type="checkbox" checked={item.checked} onChange={(e) => updateChecklistItem(index, { checked: e.target.checked })} className="h-4 w-4 shrink-0" />
-                      <input
-                        value={item.text}
-                        onChange={(e) => updateChecklistItem(index, { text: e.target.value })}
-                        className={`min-w-0 flex-1 border-b bg-transparent py-2 text-sm outline-none ${item.checked ? "muted line-through" : ""}`}
+                  return (
+                    <div className="space-y-5">
+                      <div className="flex items-center gap-4">
+                        <AlarmClock size={26} className="muted" />
+                        <input
+                          value={draft.title || ""}
+                          onChange={(e) => updateDraft({ title: e.target.value })}
+                          className="min-w-0 flex-1 bg-transparent text-3xl font-black outline-none placeholder:muted"
+                          placeholder="Add name"
+                          autoFocus
+                        />
+                      </div>
+
+                      <textarea
+                        value={reminder.description}
+                        onChange={(event) => updateReminder({ description: event.target.value })}
+                        className="min-h-24 w-full resize-none rounded-[22px] border bg-transparent p-4 text-sm leading-6 outline-none placeholder:muted"
                         style={{ borderColor: "var(--line)" }}
-                        placeholder="List item"
-                        autoFocus={index === draft.items.length - 1}
+                        placeholder="Description"
                       />
-                      <button type="button" onClick={() => removeChecklistItem(index)} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg muted hover:bg-white/5"><X size={14} /></button>
+
+                      <div className="divide-y rounded-[24px] border" style={{ borderColor: "var(--line)" }}>
+                        <label className="flex items-center gap-4 p-4">
+                          <CalendarDays size={22} className="muted" />
+                          <input
+                            type="date"
+                            value={reminder.date}
+                            onChange={(event) => updateReminder({ date: event.target.value })}
+                            className="min-w-0 flex-1 bg-transparent text-lg font-bold outline-none"
+                          />
+                        </label>
+
+                        <div className="space-y-3 p-4">
+                          <div className="flex items-center gap-4">
+                            <Bell size={22} className="muted" />
+                            <input
+                              type="time"
+                              value={reminder.time}
+                              onChange={(event) => updateReminder({ time: event.target.value })}
+                              className="min-w-0 bg-transparent text-lg font-bold outline-none"
+                            />
+                          </div>
+
+                          <div className="space-y-2 pl-10">
+                            {reminder.notifications.map((notification, index) => (
+                              <div key={`${notification}-${index}`} className="flex items-center gap-2">
+                                <select
+                                  value={notification}
+                                  onChange={(event) => updateReminder({
+                                    notifications: Array.from(
+                                      new Set(
+                                        reminder.notifications.map((item, itemIndex) =>
+                                          itemIndex === index ? event.target.value as ReminderNotificationKey : item
+                                        )
+                                      )
+                                    ),
+                                  })}
+                                  className="input min-w-0 flex-1"
+                                >
+                                  {reminderNotificationOptions.map((option) => (
+                                    <option key={option.key} value={option.key}>
+                                      {option.label}
+                                    </option>
+                                  ))}
+                                </select>
+                                <button
+                                  type="button"
+                                  onClick={() => removeReminderNotification(index)}
+                                  className="grid h-8 w-8 shrink-0 place-items-center rounded-lg muted hover:bg-white/5"
+                                  aria-label="Remove notification"
+                                >
+                                  <X size={16} />
+                                </button>
+                              </div>
+                            ))}
+
+                            <button
+                              type="button"
+                              onClick={addReminderNotification}
+                              disabled={reminder.notifications.length >= reminderNotificationOptions.length}
+                              className="mt-1 text-sm font-black accent disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              Add notification
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  ))}
-                  <button type="button" onClick={addChecklistItem} className="btn btn-secondary mt-2"><Plus size={15} /> List item</button>
-                </div>
+                  )
+                })()
+              ) : (
+                <>
+                  <input
+                    value={draft.title || ""}
+                    onChange={(e) => updateDraft({ title: e.target.value })}
+                    className="w-full min-w-0 bg-transparent text-xl font-black outline-none placeholder:muted sm:text-2xl"
+                    placeholder="Title"
+                  />
+
+                  {draft.type === "TEXT" ? (
+                    <textarea
+                      value={draft.content || ""}
+                      onChange={(e) => updateDraft({ content: e.target.value })}
+                      className="mt-4 min-h-[220px] w-full resize-none bg-transparent text-base leading-7 outline-none placeholder:muted sm:min-h-[280px] sm:text-sm"
+                      placeholder="Take a note..."
+                      autoFocus
+                    />
+                  ) : (
+                    <div className="mt-5 space-y-2">
+                      {draft.items.map((item, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <input type="checkbox" checked={item.checked} onChange={(e) => updateChecklistItem(index, { checked: e.target.checked })} className="h-4 w-4 shrink-0" />
+                          <input
+                            value={item.text}
+                            onChange={(e) => updateChecklistItem(index, { text: e.target.value })}
+                            className={`min-w-0 flex-1 border-b bg-transparent py-2 text-sm outline-none ${item.checked ? "muted line-through" : ""}`}
+                            style={{ borderColor: "var(--line)" }}
+                            placeholder="List item"
+                            autoFocus={index === draft.items.length - 1}
+                          />
+                          <button type="button" onClick={() => removeChecklistItem(index)} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg muted hover:bg-white/5"><X size={14} /></button>
+                        </div>
+                      ))}
+                      <button type="button" onClick={addChecklistItem} className="btn btn-secondary mt-2"><Plus size={15} /> List item</button>
+                    </div>
+                  )}
+                </>
               )}
 
-              <div className="mt-7 border-t pt-5" style={{ borderColor: "var(--line)" }}>
+              {draft.type !== "REMINDER" && <div className="mt-7 border-t pt-5" style={{ borderColor: "var(--line)" }}>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <Sparkles size={16} className="accent" />
@@ -1102,9 +1458,9 @@ export default function NotesPage() {
                     )}
                   </div>
                 )}
-              </div>
+              </div>}
 
-              <div className="mt-7 border-t pt-5" style={{ borderColor: "var(--line)" }}>
+              {draft.type !== "REMINDER" && <div className="mt-7 border-t pt-5" style={{ borderColor: "var(--line)" }}>
                 <div className="flex items-center gap-2"><Tags size={16} className="accent" /><p className="text-xs font-black uppercase tracking-wider muted">Tags</p></div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {draft.tags.map((tag) => (
@@ -1128,7 +1484,7 @@ export default function NotesPage() {
                     Add
                   </button>
                 </div>
-              </div>
+              </div>}
 
               <div className="mt-6 border-t pt-5" style={{ borderColor: "var(--line)" }}>
                 <div className="flex items-center gap-2">
@@ -1201,6 +1557,11 @@ export default function NotesPage() {
               <button
                 type="button"
                 onClick={() => {
+                  if (draft.type === "REMINDER") {
+                    updateDraft({ archived: !draft.archived })
+                    return
+                  }
+
                   const next = touchNote({ ...draft, archived: !draft.archived })
                   if (saveTimer.current) clearTimeout(saveTimer.current)
                   setNotes((current) =>

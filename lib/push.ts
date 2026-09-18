@@ -39,6 +39,10 @@ function routeFor(title: string) {
     return "/recurring"
   }
 
+  if (t.includes("reminder")) {
+    return "/notes"
+  }
+
   return "/dashboard"
 }
 

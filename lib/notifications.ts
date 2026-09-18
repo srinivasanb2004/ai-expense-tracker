@@ -172,6 +172,37 @@ async function createOnce(
   )
 }
 
+async function createExactOnce(
+  userId: string,
+  title: string,
+  body: string
+) {
+  const existing =
+    await prisma.notification.findFirst(
+      {
+        where: {
+          userId,
+          title,
+          body,
+        },
+      }
+    )
+
+  if (existing) {
+    return null
+  }
+
+  return prisma.notification.create(
+    {
+      data: {
+        userId,
+        title,
+        body,
+      },
+    }
+  )
+}
+
 /* ========================================
    INCOME ADDED
 ======================================== */
@@ -1219,6 +1250,123 @@ export async function syncBorrowLendNotifications(
 }
 
 /* ========================================
+   NOTE REMINDERS
+======================================== */
+
+type ReminderNotificationKey =
+  | "AT_TIME"
+  | "TEN_MINUTES_BEFORE"
+  | "ONE_HOUR_BEFORE"
+  | "ONE_DAY_BEFORE"
+  | "ONE_WEEK_BEFORE"
+
+type ReminderData = {
+  description?: string
+  date?: string
+  time?: string
+  notifications?: string[]
+}
+
+const reminderOffsets: Record<ReminderNotificationKey, { label: string; ms: number }> = {
+  AT_TIME: { label: "At time of reminder", ms: 0 },
+  TEN_MINUTES_BEFORE: { label: "10 minutes before", ms: 10 * 60 * 1000 },
+  ONE_HOUR_BEFORE: { label: "1 hour before", ms: 60 * 60 * 1000 },
+  ONE_DAY_BEFORE: { label: "1 day before", ms: 24 * 60 * 60 * 1000 },
+  ONE_WEEK_BEFORE: { label: "1 week before", ms: 7 * 24 * 60 * 60 * 1000 },
+}
+
+function parseReminderContent(content: string | null): ReminderData | null {
+  try {
+    const parsed = JSON.parse(content || "{}")
+    if (!parsed || typeof parsed !== "object") return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+function reminderDateTimeUtc(date: string, time: string) {
+  const [year, month, day] = date.split("-").map(Number)
+  const [hour, minute] = time.split(":").map(Number)
+
+  if (!year || !month || !day || Number.isNaN(hour) || Number.isNaN(minute)) {
+    return null
+  }
+
+  return new Date(Date.UTC(year, month - 1, day, hour - 5, minute - 30))
+}
+
+export async function syncNoteReminderNotifications(
+  userId: string,
+  now = new Date(),
+  options?: {
+    noteId?: string
+  }
+) {
+  const notes = await prisma.note.findMany({
+    where: {
+      userId,
+      type: "REMINDER",
+      archived: false,
+      ...(options?.noteId ? { id: options.noteId } : {}),
+    },
+    orderBy: {
+      updatedAt: "desc",
+    },
+  })
+
+  const notificationIds: string[] = []
+  const windowStart = new Date(now.getTime() - 36 * 60 * 60 * 1000)
+
+  for (const note of notes) {
+    const reminder = parseReminderContent(note.content)
+    if (!reminder?.date || !reminder?.time) continue
+
+    const dueAt = reminderDateTimeUtc(reminder.date, reminder.time)
+    if (!dueAt) continue
+
+    const notifications = Array.isArray(reminder.notifications) && reminder.notifications.length
+      ? reminder.notifications
+      : ["AT_TIME"]
+
+    const dateLabel = dueAt.toLocaleString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      timeZone: "Asia/Kolkata",
+    })
+
+    for (const key of notifications) {
+      if (!(key in reminderOffsets)) continue
+
+      const offset = reminderOffsets[key as ReminderNotificationKey]
+      const triggerAt = new Date(dueAt.getTime() - offset.ms)
+
+      if (triggerAt > now || triggerAt < windowStart) {
+        continue
+      }
+
+      const title = `Reminder: ${note.title || "Untitled reminder"} · ${offset.label}`
+      const body = reminder.description?.trim()
+        ? `${reminder.description.trim()} (${dateLabel})`
+        : `Your reminder is scheduled for ${dateLabel}.`
+
+      const notification = await createExactOnce(
+        userId,
+        title,
+        body
+      )
+
+      if (notification) notificationIds.push(notification.id)
+    }
+  }
+
+  return notificationIds
+}
+
+/* ========================================
    SYNC EVERYTHING
 ======================================== */
 
@@ -1247,6 +1395,10 @@ export async function syncAllNotifications(
     ),
 
     syncBorrowLendNotifications(
+      userId
+    ),
+
+    syncNoteReminderNotifications(
       userId
     ),
   ])
