@@ -312,6 +312,7 @@ export default function NotesPage() {
   const [creatingAction, setCreatingAction] = useState(false)
   const [actionError, setActionError] = useState("")
   const [createdSuggestionIds, setCreatedSuggestionIds] = useState<string[]>([])
+  const [editorViewport, setEditorViewport] = useState({ height: 0, offsetTop: 0 })
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const saveQueue = useRef<Promise<void>>(Promise.resolve())
   const saveVersions = useRef<Record<string, number>>({})
@@ -341,6 +342,33 @@ export default function NotesPage() {
   useEffect(() => {
     load()
   }, [])
+
+  useEffect(() => {
+    if (!draft) return
+    if (typeof window === "undefined") return
+
+    function updateEditorViewport() {
+      const viewport = window.visualViewport
+
+      setEditorViewport({
+        height: Math.floor(viewport?.height || window.innerHeight),
+        offsetTop: Math.floor(viewport?.offsetTop || 0),
+      })
+    }
+
+    updateEditorViewport()
+
+    const viewport = window.visualViewport
+    viewport?.addEventListener("resize", updateEditorViewport)
+    viewport?.addEventListener("scroll", updateEditorViewport)
+    window.addEventListener("resize", updateEditorViewport)
+
+    return () => {
+      viewport?.removeEventListener("resize", updateEditorViewport)
+      viewport?.removeEventListener("scroll", updateEditorViewport)
+      window.removeEventListener("resize", updateEditorViewport)
+    }
+  }, [draft?.id])
 
   async function create(type: Note["type"]) {
     setPlusOpen(false)
@@ -1175,9 +1203,17 @@ export default function NotesPage() {
       </div>
 
       {draft && editing && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 px-3 py-[max(14px,env(safe-area-inset-top))] backdrop-blur-sm sm:p-4">
+        <div
+          className="fixed left-0 right-0 top-0 z-[110] flex items-start justify-center overflow-hidden bg-black/60 px-3 py-2 backdrop-blur-sm sm:inset-0 sm:items-center sm:p-4"
+          style={{
+            height: editorViewport.height ? `${editorViewport.height}px` : "100dvh",
+            top: editorViewport.offsetTop ? `${editorViewport.offsetTop}px` : undefined,
+            paddingTop: "max(8px, env(safe-area-inset-top))",
+            paddingBottom: "max(8px, env(safe-area-inset-bottom))",
+          }}
+        >
           <div
-            className="note-editor flex h-[calc(100dvh-28px)] max-h-[760px] w-full min-w-0 max-w-2xl flex-col overflow-hidden rounded-[26px] border shadow-2xl sm:h-auto sm:max-h-[94vh] sm:rounded-[30px]"
+            className="note-editor flex h-full max-h-full w-full min-w-0 max-w-2xl flex-col overflow-hidden rounded-[26px] border shadow-2xl sm:h-auto sm:max-h-[94vh] sm:rounded-[30px]"
             style={{
               background: colorValue(draft.color),
               borderColor: "var(--line)",
